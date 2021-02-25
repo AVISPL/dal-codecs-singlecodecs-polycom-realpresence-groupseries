@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2019 AVI-SPL Inc. All Rights Reserved.
+ * Copyright (c) 2015-2021 AVI-SPL Inc. All Rights Reserved.
  */
 package com.avispl.dal.communicator.polycom.groupseries;
 
@@ -81,11 +81,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final String CONTENT_RX_FRAMERATE_CODE = "rcfr";
     private static final String CONTENT_TX_PACKETLOSS_CODE = "tcpl";
     private static final String CONTENT_RX_PACKETLOSS_CODE = "rcpl";
-//    private static final String CONTENT_TX_CODEC_CODE = "tctp";
     private static final String CONTENT_RX_CODEC_CODE = "rctp";
-//    private static final String CONTENT_TX_FORMAT_CODE = "tctf";
-//    private static final String CONTENT_RX_FORMAT_CODE = "rctf";
-
 
     private static final String TOTAL_TX_PACKETLOSS_CODE = "pktloss";
     private static final String PERCENT_TX_PACKETLOSS_CODE = "%pktloss";
@@ -96,6 +92,36 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final String NULL_STATISTIC = "---";
     private static final int MAX_STATUS_POLL_ATTEMPT = 20; // TODO extract into configurable property
     private static final int RETRY_INTERVAL_MILLISEC = 1000; // TODO extract into configurable property
+
+    private static void cleanDisabledStats(ContentChannelStats stats) {
+        if (stats.getFrameRateRx() == 0.0 &&
+                (stats.getFrameSizeRx() == null || Objects.equals(stats.getFrameSizeRx(), NULL_STATISTIC))
+                && stats.getBitRateRx() == 0) {
+            stats.setFrameRateRx(null);
+            stats.setBitRateRx(null);
+            stats.setPacketLossRx(null);
+        }
+        if (stats.getFrameRateTx() == 0.0 && (stats.getFrameSizeTx() == null
+                || Objects.equals(stats.getFrameSizeTx(), NULL_STATISTIC)) && stats.getBitRateTx() == 0) {
+            stats.setFrameRateTx(null);
+            stats.setBitRateTx(null);
+            stats.setPacketLossTx(null);
+        }
+    }
+
+    private static boolean isNotEmpty(VideoChannelStats videoChannelStats) {
+        return !Objects.equals(videoChannelStats.getCodec(), NULL_STATISTIC)
+                || Optional.ofNullable(videoChannelStats.getBitRateTx()).orElse(0) != 0
+                || Optional.ofNullable(videoChannelStats.getBitRateRx()).orElse(0) != 0
+                || Optional.ofNullable(videoChannelStats.getJitterRx()).orElse(0F) != 0
+                || Optional.ofNullable(videoChannelStats.getJitterTx()).orElse(0F) != 0
+                || Optional.ofNullable(videoChannelStats.getPacketLossRx()).orElse(0) != 0
+                || Optional.ofNullable(videoChannelStats.getPacketLossTx()).orElse(0) != 0
+                || Optional.ofNullable(videoChannelStats.getFrameRateRx()).orElse(0F) != 0
+                || Optional.ofNullable(videoChannelStats.getFrameRateTx()).orElse(0F) != 0
+                || (videoChannelStats.getFrameSizeRx() != null && !Objects.equals(videoChannelStats.getFrameSizeRx(), NULL_STATISTIC))
+                || (videoChannelStats.getFrameSizeRx() != null && !Objects.equals(videoChannelStats.getFrameSizeTx(), NULL_STATISTIC));
+    }
 
     /**
      * {@inheritDoc}
@@ -309,8 +335,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 
                 if (networkToken.contains(TOKEN_SEPERATOR)) {
                     String[] tokenItems = networkToken.split(TOKEN_SEPERATOR);
-                    if (tokenItems.length > 1) // check if we have key and value
-                    {
+                    if (tokenItems.length > 1) { // check if we have key and value
                         String tokenKey = tokenItems[0];
                         String tokenValue = tokenItems[1];
 
@@ -564,39 +589,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         return singletonList(statistics);
     }
 
-	private void cleanDisabledStats(ContentChannelStats stats) {
-			if (stats.getFrameRateRx() == 0.0 &&
-          (stats.getFrameSizeRx() == null || Objects.equals(stats.getFrameSizeRx(), NULL_STATISTIC)) &&
-					stats.getBitRateRx() == 0) {
-
-					stats.setFrameRateRx(null);
-					stats.setBitRateRx(null);
-					stats.setPacketLossRx(null);
-			}
-			if (stats.getFrameRateTx() == 0.0 &&
-          (stats.getFrameSizeTx() == null || Objects.equals(stats.getFrameSizeTx(), NULL_STATISTIC)) &&
-					stats.getBitRateTx() == 0) {
-
-					stats.setFrameRateTx(null);
-					stats.setBitRateTx(null);
-					stats.setPacketLossTx(null);
-			}
-	}
-
-	private boolean isNotEmpty(VideoChannelStats videoChannelStats) {
-    	return !Objects.equals(videoChannelStats.getCodec(), NULL_STATISTIC)
-					|| Optional.ofNullable(videoChannelStats.getBitRateTx()).orElse(0) != 0
-					|| Optional.ofNullable(videoChannelStats.getBitRateRx()).orElse(0) != 0
-					|| Optional.ofNullable(videoChannelStats.getJitterRx()).orElse(0F) != 0
-					|| Optional.ofNullable(videoChannelStats.getJitterTx()).orElse(0F) != 0
-					|| Optional.ofNullable(videoChannelStats.getPacketLossRx()).orElse(0) != 0
-					|| Optional.ofNullable(videoChannelStats.getPacketLossTx()).orElse(0) != 0
-					|| Optional.ofNullable(videoChannelStats.getFrameRateRx()).orElse(0F) != 0
-					|| Optional.ofNullable(videoChannelStats.getFrameRateTx()).orElse(0F) != 0
-					|| (videoChannelStats.getFrameSizeRx() != null && !Objects.equals(videoChannelStats.getFrameSizeRx(), NULL_STATISTIC))
-					|| (videoChannelStats.getFrameSizeRx() != null && !Objects.equals(videoChannelStats.getFrameSizeTx(), NULL_STATISTIC));
-		}
-
     /**
      * {@inheritDoc} <br>
      * <b>PolycomGroupSeries Specific Implementation notes:</b><br>
@@ -605,8 +597,8 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     @Override
     public String dial(DialDevice device) throws Exception {
-        // dial manual â€œspeedâ€� â€œdialstr1â€� [dialstr] [h323|ip|sip]
-        // hangup video [callidâ]
+        // dial manual "speed" "dialstr1" [dialstr] [h323|ip|sip]
+        // hangup video [callid]
         String command = null;
         Integer callSpeed = device.getCallSpeed();
         String speed = "1920";// speed has to have some value in order for dial string to be valid
@@ -621,7 +613,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 				}
 				send(command);
 		/*		Dials a video call number dialstr1 at speed of type
-				h323. Requires the parameters â€œspeedâ€� and â€œdialstrâ€�.
+				h323. Requires the parameters "speed" and "dialstr".
 				Allows the user to automatically dial a number. .
 				Deprecated. Instead of this command, Polycom
 				recommends using dial manual and not specifying
@@ -763,17 +755,11 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private RegistrationStatus retrieveRegistrationStatus() throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
 
-        // String sipRegistrarEnabledResponse = send("systemsetting get sipenable");
-        // String sipRegistrarStatusResponse = send("systemsetting get sipregistrarserver");
-
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
         String sipRegistrarIpString = send(SYSTEMSETTING_GET_SIPREGISTRARSERVER).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
         if (!StringUtils.isNullOrEmpty(sipRegistrarIpString)) {
             registrationStatus.setSipRegistrar(sipRegistrarIpString);
         }
-
-        // String h323GatekeeperEnabledResponse = send("systemsetting get h323enable");
-        // String h323GatekeeperStatusResponse = send("gatekeeperip get");
 
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the gatekeeper)
         String gatekeeperIpString = send(GATEKEEPERIP_GET).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
