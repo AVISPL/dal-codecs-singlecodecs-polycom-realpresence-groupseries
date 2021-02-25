@@ -15,6 +15,7 @@ import com.avispl.symphony.api.dal.dto.monitor.*;
 import com.avispl.symphony.api.dal.error.CommandFailureException;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.dal.communicator.SshCommunicator;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.security.auth.login.FailedLoginException;
 import java.util.*;
@@ -694,9 +695,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     @Override
     public void sendMessage(PopupMessage message) throws Exception {
-        // The command showpopup did not work with polycom GS
-        // String command = "showpopup \"" + message.getMessage() + "\"";
-        // send(command);
+        throw new NotImplementedException();
     }
 
     /**
