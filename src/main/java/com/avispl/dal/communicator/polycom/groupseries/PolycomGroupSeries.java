@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020 AVI-SPL Inc. All Rights Reserved.
+ * Copyright (c) 2015-2021 AVI-SPL Inc. All Rights Reserved.
  */
 package com.avispl.dal.communicator.polycom.groupseries;
 
