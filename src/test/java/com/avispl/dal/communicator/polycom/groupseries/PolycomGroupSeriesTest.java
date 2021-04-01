@@ -21,6 +21,7 @@ import java.util.function.Supplier;
 
 import com.avispl.dal.communicator.polycom.groupseries.PolycomGroupSeries;
 import com.avispl.symphony.api.dal.control.call.CallController;
+import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.dal.util.StringUtils;
 import org.apache.log4j.Level;
@@ -414,6 +415,15 @@ public class PolycomGroupSeriesTest {
 				fail("Device Failed to execute send message command: " + e.toString());
 			}
 		}
+	}
+
+	@Test
+	public void testRetrieveStatistics() throws Exception {
+		List<Statistics> statistics = polycomGroupSeries.getMultipleStatistics();
+		ControllableProperty controllableProperty = new ControllableProperty();
+		controllableProperty.setProperty("Camera#Pan");
+		controllableProperty.setValue("0.0");
+		polycomGroupSeries.controlProperty(controllableProperty);
 	}
 
 	/**
