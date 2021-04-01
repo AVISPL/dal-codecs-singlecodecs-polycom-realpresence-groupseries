@@ -16,7 +16,7 @@ jobs:
     - name: PMD check
       run: mvn pmd:check
     - id: getfilename
-      run: echo "::set-output name=file::$(ls target/symphony-dal-communicator-polycom-groupseries-[0-9].[0-9].[0-9].jar)"
+      run: echo "::set-output name=file::$(ls target/symphony-dal-communicator-polycom-groupseries-[0-9].[0-9].[0-9]-SNAPSHOT.jar)"
     - uses: actions/upload-artifact@v1
       with:
         name: PolycomGroupSeries
