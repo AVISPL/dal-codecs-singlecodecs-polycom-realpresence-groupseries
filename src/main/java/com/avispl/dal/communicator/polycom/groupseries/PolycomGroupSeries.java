@@ -458,11 +458,11 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                 }
             }
             if (Objects.equals(videoChannelStats.getCodec(), NULL_STATISTIC)
-                && Objects.equals(audioChannelStats.getCodec(), NULL_STATISTIC)
-                && Objects.equals(callStats.getProtocol(), NULL_STATISTIC)
-                && callStats.getPercentPacketLossTx() == null
-                && Objects.equals(videoChannelStats.getFrameSizeRx(), NULL_STATISTIC)
-                && Objects.equals(videoChannelStats.getFrameSizeTx(), NULL_STATISTIC)) {
+                    && Objects.equals(audioChannelStats.getCodec(), NULL_STATISTIC)
+                    && Objects.equals(callStats.getProtocol(), NULL_STATISTIC)
+                    && callStats.getPercentPacketLossTx() == null
+                    && Objects.equals(videoChannelStats.getFrameSizeRx(), NULL_STATISTIC)
+                    && Objects.equals(videoChannelStats.getFrameSizeTx(), NULL_STATISTIC)) {
                 return singletonList(new EndpointStatistics());
             }
         } else {
@@ -652,7 +652,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 
         //check no content sharing
         if (isNotEmpty(contentChannelStats)) {
-        		cleanDisabledStats(contentChannelStats);
+            cleanDisabledStats(contentChannelStats);
             statistics.setContentChannelStats(contentChannelStats);
         }
 
@@ -661,67 +661,67 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 
     private void populateCameraData(Map<String, String> statistics, List<AdvancedControllableProperty> advancedControllableProperties) throws Exception {
         String invertNear = send(String.format(CAMERA_INVERT_NEAR, GET));
-        if(validateCameraProperty(invertNear)) {
+        if (validateCameraProperty(invertNear)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_INVERT,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(invertNear, "get\r\ncamerainvert near ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_INVERT, "");
         }
         String nearTracking = send(String.format(CAMERA_NEAR_TRACKING, GET));
-        if(validateCameraProperty(nearTracking)) {
+        if (validateCameraProperty(nearTracking)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(nearTracking, "get\r\ncamera near tracking ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING, "");
         }
         String trackingCalibrate = send(String.format(CAMERA_NEAR_TRACKING_CALIBRATE, GET));
-        if(validateCameraProperty(trackingCalibrate)) {
+        if (validateCameraProperty(trackingCalibrate)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_CALIBRATE,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingCalibrate, "get\r\ncameratracking near calibrate ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_CALIBRATE, "");
         }
         String trackingFraming = send(String.format(CAMERA_NEAR_TRACKING_FRAMING, GET));
-        if(validateCameraProperty(trackingCalibrate)) {
-            advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_FRAMING, Arrays.asList("wide","medium","tight"),
+        if (validateCameraProperty(trackingCalibrate)) {
+            advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_FRAMING, Arrays.asList("wide", "medium", "tight"),
                     StringUtils.getDataBetween(trackingFraming, "get\r\ncameratracking near framing ", LINE_BREAKER)));
             statistics.put(CAMERA_LABEL_TRACKING_FRAMING, "");
         }
         String trackingMode = send(String.format(CAMERA_NEAR_TRACKING_MODE, GET));
-        if(validateCameraProperty(trackingMode)) {
-            advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_MODE, Arrays.asList("off","group","speaker","groupwithtransition"),
+        if (validateCameraProperty(trackingMode)) {
+            advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_MODE, Arrays.asList("off", "group", "speaker", "groupwithtransition"),
                     StringUtils.getDataBetween(trackingMode, "get\r\ncameratracking near mode ", LINE_BREAKER)));
             statistics.put(CAMERA_LABEL_TRACKING_MODE, "");
         }
         String trackingParticipant = send(String.format(CAMERA_NEAR_TRACKING_PARTICIPANT, GET));
-        if(validateCameraProperty(trackingParticipant)) {
+        if (validateCameraProperty(trackingParticipant)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_PARTICIPANT,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingParticipant, "get\r\ncameratracking near participant ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_PARTICIPANT, "");
         }
         String trackingPip = send(String.format(CAMERA_NEAR_TRACKING_PIP, GET));
-        if(validateCameraProperty(trackingPip)) {
+        if (validateCameraProperty(trackingPip)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_PIP,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingPip, "get\r\ncameratracking near pip ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_PIP, "");
         }
         String trackingWake = send(String.format(CAMERA_NEAR_TRACKING_WAKE, GET));
-        if(validateCameraProperty(trackingWake)) {
+        if (validateCameraProperty(trackingWake)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_WAKE,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingWake, "get\r\ncameratracking near wake ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_WAKE, "");
         }
         String trackingSpeed = send(String.format(CAMERA_NEAR_TRACKING_SPEED, GET));
-        if(validateCameraProperty(trackingSpeed)) {
-            advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_SPEED, Arrays.asList("off","slow","normal","fast"),
+        if (validateCameraProperty(trackingSpeed)) {
+            advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_SPEED, Arrays.asList("off", "slow", "normal", "fast"),
                     StringUtils.getDataBetween(trackingSpeed, "get\r\ncameratracking near speed ", LINE_BREAKER)));
             statistics.put(CAMERA_LABEL_TRACKING_SPEED, "");
         }
         String videoMute = send(String.format(VIDEOMUTE, GET));
-        if(validateCameraProperty(videoMute)) {
+        if (validateCameraProperty(videoMute)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_MUTE,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(videoMute, "get\r\nvideomute near ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_MUTE, "");
         }
         Map<String, Float> cameraPosition = getCameraPosition();
-        if(!cameraPosition.isEmpty()) {
+        if (!cameraPosition.isEmpty()) {
             advancedControllableProperties.add(createSlider(CAMERA_LABEL_PAN, -50000.0f, 50000.0f, cameraPosition.get("Pan")));
             statistics.put(CAMERA_LABEL_PAN, "");
 
@@ -738,7 +738,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * float[0] - Pan
      * float[1] - Tilt
      * float[2] - Zoom
-     *
+     * <p>
      * Values are signed, between -50000 and 50000
      *
      * @return Map with Pan/Tilt/Zoom Float values
@@ -747,7 +747,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private Map<String, Float> getCameraPosition() throws Exception {
         String cameraPosition = send(CAMERA_NEAR_GETPOSITION);
         Map<String, Float> cameraPositionProperties = new HashMap<>();
-        if(validateCameraProperty(cameraPosition)) {
+        if (validateCameraProperty(cameraPosition)) {
             Matcher sourceMatcher = Pattern.compile("(\\S?\\d{1,5})\\s(\\S?\\d{1,5})\\s(\\S?\\d{1,5})").matcher(cameraPosition);
             if (sourceMatcher.find()) {
                 cameraPositionProperties.put("Pan", Float.parseFloat(sourceMatcher.group(1)));
@@ -765,11 +765,16 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @return boolean indicating whether property is valid and values can be extracted, or not
      */
     private boolean validateCameraProperty(String value) {
-        if(StringUtils.isNullOrEmpty(value, true)) {
+        if (StringUtils.isNullOrEmpty(value, true)) {
             return false;
         }
-        if(value.contains("only supported")) {
-            if(logger.isDebugEnabled()) {
+        if (value.contains("only supported")) {
+            /**
+             * If the property is not supported - the message would be similar to
+             * "this feature is only supported for eagle eye director 2", indicating the device needs for this
+             * functionality to be supported.
+             */
+            if (logger.isDebugEnabled()) {
                 logger.debug("Cannot add controllable property: " + value);
             }
             return false;
@@ -780,7 +785,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     /**
      * Get microphones status and volume level of the device, to build controllable properties for these parameters.
      *
-     * @param statistics ExtendedStatistics map, that contains all the statistics properties
+     * @param statistics                     ExtendedStatistics map, that contains all the statistics properties
      * @param advancedControllableProperties list of controllable properties, to add current properties to
      * @throws Exception if any error occurs
      */
@@ -790,16 +795,16 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 
         String volume = send(String.format(VOLUME, GET));
 
-        if(StringUtils.isNullOrEmpty(volume, true)) {
-            if(logger.isDebugEnabled()) {
+        if (StringUtils.isNullOrEmpty(volume, true)) {
+            if (logger.isDebugEnabled()) {
                 logger.debug("Empty volume command response, skipping.");
             }
             return;
         }
         String volumeLevel = StringUtils.getDataBetween(volume, "get\r\nvolume ", LINE_BREAKER);
 
-        if(StringUtils.isNullOrEmpty(volumeLevel, true)) {
-            if(logger.isDebugEnabled()) {
+        if (StringUtils.isNullOrEmpty(volumeLevel, true)) {
+            if (logger.isDebugEnabled()) {
                 logger.debug("Empty volume level command response, skipping.");
             }
             return;
@@ -816,34 +821,34 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private void populateDeviceData(Map<String, String> statistics) throws Exception {
         String whoamiLines = send(WHOAMI);
-        if(StringUtils.isNullOrEmpty(whoamiLines, true)) {
-            if(logger.isDebugEnabled()) {
+        if (StringUtils.isNullOrEmpty(whoamiLines, true)) {
+            if (logger.isDebugEnabled()) {
                 logger.debug("Empty whoami command response, skipping.");
             }
             return;
         }
         addStatisticsProperty(statistics, "Device#Name", StringUtils.getDataBetween(whoamiLines, "Hi, my name is : ", LINE_BREAKER));
         addStatisticsProperty(statistics, "Device#Model", StringUtils.getDataBetween(whoamiLines, "Model: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#SoftwareVersion",  StringUtils.getDataBetween(whoamiLines, "Software Version: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#SerialNumber",  StringUtils.getDataBetween(whoamiLines, "Serial Number: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#Build",  StringUtils.getDataBetween(whoamiLines, "Build Information: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#TimeInLastCall",  StringUtils.getDataBetween(whoamiLines, "Time In Last Call: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#TimeInCallsTotal",  StringUtils.getDataBetween(whoamiLines, "Total Time In Calls: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#TotalCalls",  StringUtils.getDataBetween(whoamiLines, "Total Calls: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#SNTPTimeService",  StringUtils.getDataBetween(whoamiLines, "SNTP Time Service: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#LocalTime",  StringUtils.getDataBetween(whoamiLines, "Local Time is: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#H323Enabled",  StringUtils.getDataBetween(whoamiLines, "H323 Enabled: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#HTTPEnabled",  StringUtils.getDataBetween(whoamiLines, "HTTP Enabled: ", LINE_BREAKER));
-        addStatisticsProperty(statistics, "Device#SNMPEnabled",  StringUtils.getDataBetween(whoamiLines, "SNMP Enabled: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#SoftwareVersion", StringUtils.getDataBetween(whoamiLines, "Software Version: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#SerialNumber", StringUtils.getDataBetween(whoamiLines, "Serial Number: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#Build", StringUtils.getDataBetween(whoamiLines, "Build Information: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#TimeInLastCall", StringUtils.getDataBetween(whoamiLines, "Time In Last Call: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#TimeInCallsTotal", StringUtils.getDataBetween(whoamiLines, "Total Time In Calls: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#TotalCalls", StringUtils.getDataBetween(whoamiLines, "Total Calls: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#SNTPTimeService", StringUtils.getDataBetween(whoamiLines, "SNTP Time Service: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#LocalTime", StringUtils.getDataBetween(whoamiLines, "Local Time is: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#H323Enabled", StringUtils.getDataBetween(whoamiLines, "H323 Enabled: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#HTTPEnabled", StringUtils.getDataBetween(whoamiLines, "HTTP Enabled: ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#SNMPEnabled", StringUtils.getDataBetween(whoamiLines, "SNMP Enabled: ", LINE_BREAKER));
 
         String uptime = send(UPTIME);
-        if(StringUtils.isNullOrEmpty(uptime, true)) {
-            if(logger.isDebugEnabled()) {
+        if (StringUtils.isNullOrEmpty(uptime, true)) {
+            if (logger.isDebugEnabled()) {
                 logger.debug("Empty uptime command response, skipping.");
             }
             return;
         }
-        addStatisticsProperty(statistics, "Device#Uptime",  StringUtils.getDataBetween(uptime, "uptime get ", LINE_BREAKER));
+        addStatisticsProperty(statistics, "Device#Uptime", StringUtils.getDataBetween(uptime, "uptime get ", LINE_BREAKER));
     }
 
     /**
@@ -853,8 +858,8 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private void extractDeviceStatus(Map<String, String> statistics, String status) {
-        if(StringUtils.isNullOrEmpty(status, true)) {
-            if(logger.isDebugEnabled()) {
+        if (StringUtils.isNullOrEmpty(status, true)) {
+            if (logger.isDebugEnabled()) {
                 logger.debug("Empty status command response, skipping.");
             }
             return;
@@ -875,12 +880,12 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     /**
      * Add statistics property for ExtendedStatistics map, if property value is not null or empty
      *
-     * @param statistics ExtendedStatistics map, that contains all the statistics properties
-     * @param propertyName name of the property to add
+     * @param statistics    ExtendedStatistics map, that contains all the statistics properties
+     * @param propertyName  name of the property to add
      * @param propertyValue value of the property, to make a check upon and add to the statistics map
      */
     private void addStatisticsProperty(Map<String, String> statistics, String propertyName, String propertyValue) {
-        if(!StringUtils.isNullOrEmpty(propertyValue, true)) {
+        if (!StringUtils.isNullOrEmpty(propertyValue, true)) {
             statistics.put(propertyName, propertyValue.trim());
         }
     }
@@ -958,11 +963,11 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         }
         // protocol is not exactly device.getProtocol().toString() for dial string;
         command = "dial manual " + speed + " " + device.getDialString();
-				Protocol protocol = device.getProtocol();
-				if(nonNull(protocol)) {
-					command += " " + protocol.name().toLowerCase();
-				}
-				send(command);
+        Protocol protocol = device.getProtocol();
+        if (nonNull(protocol)) {
+            command += " " + protocol.name().toLowerCase();
+        }
+        send(command);
 		/*		Dials a video call number dialstr1 at speed of type
 				h323. Requires the parameters "speed" and "dialstr".
 				Allows the user to automatically dial a number. .
@@ -975,16 +980,16 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         // that we are checking it against remote address. put counter here with max number of attempts, but do a loop, we less interval then 3 seconds, have it
         // configurable(extracted properties)
 
-		for (int i = 0; i < MAX_STATUS_POLL_ATTEMPT; i++) {
-			CallStats callStats = parseCallIdAndRemoteAddress(retrieveRawCallStatistics());
-			if (null != callStats) {
-				String remoteAddress = callStats.getRemoteAddress();
-				if (!StringUtils.isNullOrEmpty(remoteAddress, true) && remoteAddress.trim().equals(device.getDialString().trim())) {
-					return callStats.getCallId();
-				}
-			}
-			Thread.sleep(RETRY_INTERVAL_MILLISEC);
-		}
+        for (int i = 0; i < MAX_STATUS_POLL_ATTEMPT; i++) {
+            CallStats callStats = parseCallIdAndRemoteAddress(retrieveRawCallStatistics());
+            if (null != callStats) {
+                String remoteAddress = callStats.getRemoteAddress();
+                if (!StringUtils.isNullOrEmpty(remoteAddress, true) && remoteAddress.trim().equals(device.getDialString().trim())) {
+                    return callStats.getCallId();
+                }
+            }
+            Thread.sleep(RETRY_INTERVAL_MILLISEC);
+        }
 
         return null;
     }
@@ -1075,7 +1080,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                 send(String.format(VOLUME, SET) + removeDecimalPoint(value));
                 break;
             case AUDIO_LABEL_MUTE:
-                if("0".equals(value)) {
+                if ("0".equals(value)) {
                     unmute();
                 } else {
                     mute();
@@ -1097,16 +1102,16 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                         removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(value)));
                 break;
             case CAMERA_LABEL_MUTE:
-                send(String.format(VIDEOMUTE,  normalizeSwitchValueExternal(value)));
+                send(String.format(VIDEOMUTE, normalizeSwitchValueExternal(value)));
                 break;
             case CAMERA_LABEL_INVERT:
-                send(String.format(CAMERA_INVERT_NEAR,  normalizeSwitchValueExternal(value)));
+                send(String.format(CAMERA_INVERT_NEAR, normalizeSwitchValueExternal(value)));
                 break;
             case CAMERA_LABEL_TRACKING:
-                send(String.format(CAMERA_NEAR_TRACKING,  normalizeSwitchValueExternal(value)));
+                send(String.format(CAMERA_NEAR_TRACKING, normalizeSwitchValueExternal(value)));
                 break;
             case CAMERA_LABEL_TRACKING_CALIBRATE:
-                send(String.format(CAMERA_NEAR_TRACKING_CALIBRATE,  normalizeSwitchValueExternal(value)));
+                send(String.format(CAMERA_NEAR_TRACKING_CALIBRATE, normalizeSwitchValueExternal(value)));
                 break;
             case CAMERA_LABEL_TRACKING_FRAMING:
                 send(String.format(CAMERA_NEAR_TRACKING_FRAMING, value));
@@ -1121,7 +1126,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                 send(String.format(CAMERA_NEAR_TRACKING_PIP, value));
                 break;
             case CAMERA_LABEL_TRACKING_WAKE:
-                send(String.format(CAMERA_NEAR_TRACKING_WAKE,  normalizeSwitchValueExternal(value)));
+                send(String.format(CAMERA_NEAR_TRACKING_WAKE, normalizeSwitchValueExternal(value)));
                 break;
             case CAMERA_LABEL_TRACKING_SPEED:
                 send(String.format(CAMERA_NEAR_TRACKING_SPEED, value));
@@ -1223,8 +1228,8 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private RegistrationStatus extractRegistrationStatus(String status) throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
-        if(StringUtils.isNullOrEmpty(status, true)) {
-            if(logger.isDebugEnabled()) {
+        if (StringUtils.isNullOrEmpty(status, true)) {
+            if (logger.isDebugEnabled()) {
                 logger.debug("Empty status command response, skipping.");
             }
             return registrationStatus;
