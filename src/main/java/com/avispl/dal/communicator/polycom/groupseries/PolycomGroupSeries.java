@@ -720,15 +720,15 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(videoMute, "get\r\nvideomute near ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_MUTE, "");
         }
-        Float[] cameraPosition = getCameraPosition();
-        if(cameraPosition.length > 0) {
-            advancedControllableProperties.add(createSlider(CAMERA_LABEL_PAN, -50000.0f, 50000.0f, cameraPosition[0]));
+        Map<String, Float> cameraPosition = getCameraPosition();
+        if(!cameraPosition.isEmpty()) {
+            advancedControllableProperties.add(createSlider(CAMERA_LABEL_PAN, -50000.0f, 50000.0f, cameraPosition.get("Pan")));
             statistics.put(CAMERA_LABEL_PAN, "");
 
-            advancedControllableProperties.add(createSlider(CAMERA_LABEL_TILT, -50000.0f, 50000.0f, cameraPosition[1]));
+            advancedControllableProperties.add(createSlider(CAMERA_LABEL_TILT, -50000.0f, 50000.0f, cameraPosition.get("Tilt")));
             statistics.put(CAMERA_LABEL_TILT, "");
 
-            advancedControllableProperties.add(createSlider(CAMERA_LABEL_ZOOM, -50000.0f, 50000.0f, cameraPosition[2]));
+            advancedControllableProperties.add(createSlider(CAMERA_LABEL_ZOOM, -50000.0f, 50000.0f, cameraPosition.get("Zoom")));
             statistics.put(CAMERA_LABEL_ZOOM, "");
         }
     }
@@ -741,21 +741,21 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      *
      * Values are signed, between -50000 and 50000
      *
-     * @return float[3] with pan/tilt/zoom values
+     * @return Map with Pan/Tilt/Zoom Float values
      * @throws Exception if any error occurs
      */
-    private Float[] getCameraPosition() throws Exception {
+    private Map<String, Float> getCameraPosition() throws Exception {
         String cameraPosition = send(CAMERA_NEAR_GETPOSITION);
-        Float[] cameraPositionArray = new Float[3];
+        Map<String, Float> cameraPositionProperties = new HashMap();
         if(validateCameraProperty(cameraPosition)) {
             Matcher sourceMatcher = Pattern.compile("(\\S?\\d{1,5})\\s(\\S?\\d{1,5})\\s(\\S?\\d{1,5})").matcher(cameraPosition);
             if (sourceMatcher.find()) {
-                cameraPositionArray[0] = Float.parseFloat(sourceMatcher.group(1)); // Pan
-                cameraPositionArray[1] = Float.parseFloat(sourceMatcher.group(2)); // Tilt
-                cameraPositionArray[2] = Float.parseFloat(sourceMatcher.group(3)); // Zoom
+                cameraPositionProperties.put("Pan", Float.parseFloat(sourceMatcher.group(1)));
+                cameraPositionProperties.put("Tilt", Float.parseFloat(sourceMatcher.group(2)));
+                cameraPositionProperties.put("Zoom", Float.parseFloat(sourceMatcher.group(3)));
             }
         }
-        return cameraPositionArray;
+        return cameraPositionProperties;
     }
 
     /**
@@ -1082,19 +1082,19 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                 }
                 break;
             case CAMERA_LABEL_PAN:
-                Float[] cameraPosition = getCameraPosition();
+                Map<String, Float> cameraPosition = getCameraPosition();
                 send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(value),
-                        removeDecimalPoint(String.valueOf(cameraPosition[1])), removeDecimalPoint(String.valueOf(cameraPosition[2]))));
+                        removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(String.valueOf(cameraPosition.get("Zoom")))));
                 break;
             case CAMERA_LABEL_TILT:
                 cameraPosition = getCameraPosition();
-                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition[0])),
-                        removeDecimalPoint(value), removeDecimalPoint(String.valueOf(cameraPosition[2]))));
+                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition.get("Pan"))),
+                        removeDecimalPoint(value), removeDecimalPoint(String.valueOf(cameraPosition.get("Zoom")))));
                 break;
             case CAMERA_LABEL_ZOOM:
                 cameraPosition = getCameraPosition();
-                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition[0])),
-                        removeDecimalPoint(String.valueOf(cameraPosition[1])), removeDecimalPoint(value)));
+                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition.get("Pan"))),
+                        removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(value)));
                 break;
             case CAMERA_LABEL_MUTE:
                 send(String.format(VIDEOMUTE,  normalizeSwitchValueExternal(value)));
