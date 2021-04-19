@@ -765,7 +765,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @return boolean indicating whether property is valid and values can be extracted, or not
      */
     private boolean validateCameraProperty(String value) {
-        if(value == null) {
+        if(StringUtils.isNullOrEmpty(value, true)) {
             return false;
         }
         if(value.contains("only supported")) {
@@ -789,13 +789,23 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         statistics.put(AUDIO_LABEL_MUTE, "");
 
         String volume = send(String.format(VOLUME, GET));
-        if(volume != null) {
-            String volumeLevel = StringUtils.getDataBetween(volume, "get\r\nvolume ", LINE_BREAKER);
-            if(volumeLevel != null) {
-                advancedControllableProperties.add(createSlider(AUDIO_LABEL_VOLUME, 0.0f, 50.0f, Float.valueOf(volumeLevel)));
-                statistics.put(AUDIO_LABEL_VOLUME, "");
+
+        if(StringUtils.isNullOrEmpty(volume, true)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Empty volume command response, skipping.");
             }
+            return;
         }
+        String volumeLevel = StringUtils.getDataBetween(volume, "get\r\nvolume ", LINE_BREAKER);
+
+        if(StringUtils.isNullOrEmpty(volumeLevel, true)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Empty volume level command response, skipping.");
+            }
+            return;
+        }
+        advancedControllableProperties.add(createSlider(AUDIO_LABEL_VOLUME, 0.0f, 50.0f, Float.valueOf(volumeLevel)));
+        statistics.put(AUDIO_LABEL_VOLUME, "");
     }
 
     /**
@@ -806,6 +816,12 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private void populateDeviceData(Map<String, String> statistics) throws Exception {
         String whoamiLines = send(WHOAMI);
+        if(StringUtils.isNullOrEmpty(whoamiLines, true)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Empty whoami command response, skipping.");
+            }
+            return;
+        }
         addStatisticsProperty(statistics, "Device#Name", StringUtils.getDataBetween(whoamiLines, "Hi, my name is : ", LINE_BREAKER));
         addStatisticsProperty(statistics, "Device#Model", StringUtils.getDataBetween(whoamiLines, "Model: ", LINE_BREAKER));
         addStatisticsProperty(statistics, "Device#SoftwareVersion",  StringUtils.getDataBetween(whoamiLines, "Software Version: ", LINE_BREAKER));
@@ -821,6 +837,12 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         addStatisticsProperty(statistics, "Device#SNMPEnabled",  StringUtils.getDataBetween(whoamiLines, "SNMP Enabled: ", LINE_BREAKER));
 
         String uptime = send(UPTIME);
+        if(StringUtils.isNullOrEmpty(uptime, true)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Empty uptime command response, skipping.");
+            }
+            return;
+        }
         addStatisticsProperty(statistics, "Device#Uptime",  StringUtils.getDataBetween(uptime, "uptime get ", LINE_BREAKER));
     }
 
@@ -831,6 +853,12 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private void extractDeviceStatus(Map<String, String> statistics, String status) {
+        if(StringUtils.isNullOrEmpty(status, true)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Empty status command response, skipping.");
+            }
+            return;
+        }
         addStatisticsProperty(statistics, "SystemStatus#IPNetwork", StringUtils.getDataBetween(status, "ipnetwork ", LINE_BREAKER));
         addStatisticsProperty(statistics, "SystemStatus#TrackableCamera", StringUtils.getDataBetween(status, "trackablecamera ", LINE_BREAKER));
         addStatisticsProperty(statistics, "SystemStatus#AutoAnswerP2P", StringUtils.getDataBetween(status, "autoanswerp2p ", LINE_BREAKER));
@@ -852,7 +880,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @param propertyValue value of the property, to make a check upon and add to the statistics map
      */
     private void addStatisticsProperty(Map<String, String> statistics, String propertyName, String propertyValue) {
-        if(!StringUtils.isNullOrEmpty(propertyValue)) {
+        if(!StringUtils.isNullOrEmpty(propertyValue, true)) {
             statistics.put(propertyName, propertyValue.trim());
         }
     }
@@ -951,7 +979,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 			CallStats callStats = parseCallIdAndRemoteAddress(retrieveRawCallStatistics());
 			if (null != callStats) {
 				String remoteAddress = callStats.getRemoteAddress();
-				if (!StringUtils.isNullOrEmpty(remoteAddress) && remoteAddress.trim().equals(device.getDialString().trim())) {
+				if (!StringUtils.isNullOrEmpty(remoteAddress, true) && remoteAddress.trim().equals(device.getDialString().trim())) {
 					return callStats.getCallId();
 				}
 			}
@@ -969,7 +997,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         // hangup all
         // hangup video [callid]
         String command = null;
-        if (StringUtils.isNullOrEmpty(callId)) {
+        if (StringUtils.isNullOrEmpty(callId, true)) {
             command = HANGUP_ALL;
         } else {
             command = "hangup video " + callId;
@@ -983,7 +1011,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         CallStats callStats = parseCallIdAndRemoteAddress(retrieveRawCallStatistics());
         if (null != callStats) {
             String currentCallId = callStats.getCallId();
-            if (StringUtils.isNullOrEmpty(callId) || !StringUtils.isNullOrEmpty(currentCallId) && currentCallId.equals(callId)) {
+            if (StringUtils.isNullOrEmpty(callId, true) || !StringUtils.isNullOrEmpty(currentCallId, true) && currentCallId.equals(callId)) {
                 callStatus.setCallId(currentCallId);
                 callStatus.setCallStatusState(CallStatusState.Connected);
             } else {
@@ -1149,7 +1177,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws RuntimeException if original value is null or empty
      */
     private static String removeDecimalPoint(String value) {
-        if (com.avispl.symphony.dal.util.StringUtils.isNullOrEmpty(value)) {
+        if (StringUtils.isNullOrEmpty(value, true)) {
             throw new RuntimeException("Unable to create a control operation with null or empty control value.");
         } else {
             return String.format("%.0f", Float.valueOf(value));
@@ -1176,7 +1204,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
 
     private String[] retrieveRawCallStatistics() throws Exception {
         String activeCallStatus = send(GET_CALL_STATE);
-        if (!StringUtils.isNullOrEmpty(activeCallStatus)) {
+        if (!StringUtils.isNullOrEmpty(activeCallStatus, true)) {
             String[] callInfoArray = activeCallStatus.split(TOKEN_SEPERATOR);
             if (callInfoArray.length < 6 || callInfoArray[5] == null || !callInfoArray[5].equals(CONNECTED)) {
                 // not in a call
@@ -1195,16 +1223,22 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private RegistrationStatus extractRegistrationStatus(String status) throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
+        if(StringUtils.isNullOrEmpty(status, true)) {
+            if(logger.isDebugEnabled()) {
+                logger.debug("Empty status command response, skipping.");
+            }
+            return registrationStatus;
+        }
 
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
         String sipRegistrarIpString = send(SYSTEMSETTING_GET_SIPREGISTRARSERVER).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
-        if (!StringUtils.isNullOrEmpty(sipRegistrarIpString)) {
+        if (!StringUtils.isNullOrEmpty(sipRegistrarIpString, true)) {
             registrationStatus.setSipRegistrar(sipRegistrarIpString);
         }
 
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the gatekeeper)
         String gatekeeperIpString = send(GATEKEEPERIP_GET).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
-        if (!StringUtils.isNullOrEmpty(gatekeeperIpString)) {
+        if (!StringUtils.isNullOrEmpty(gatekeeperIpString, true)) {
             registrationStatus.setH323Gatekeeper(gatekeeperIpString);
         }
         String gateKeeper = StringUtils.getDataBetween(status, "gatekeeper ", LINE_BREAKER);
