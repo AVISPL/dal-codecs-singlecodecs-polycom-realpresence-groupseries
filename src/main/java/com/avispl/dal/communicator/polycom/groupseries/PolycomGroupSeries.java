@@ -746,7 +746,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private Map<String, Float> getCameraPosition() throws Exception {
         String cameraPosition = send(CAMERA_NEAR_GETPOSITION);
-        Map<String, Float> cameraPositionProperties = new HashMap();
+        Map<String, Float> cameraPositionProperties = new HashMap<>();
         if(validateCameraProperty(cameraPosition)) {
             Matcher sourceMatcher = Pattern.compile("(\\S?\\d{1,5})\\s(\\S?\\d{1,5})\\s(\\S?\\d{1,5})").matcher(cameraPosition);
             if (sourceMatcher.find()) {
