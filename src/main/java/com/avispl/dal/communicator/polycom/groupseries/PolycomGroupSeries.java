@@ -660,61 +660,61 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     }
 
     private void populateCameraData(Map<String, String> statistics, List<AdvancedControllableProperty> advancedControllableProperties) throws Exception {
-        String invertNear = send(String.format(CAMERA_INVERT_NEAR, GET));
+        String invertNear = retrieveDeviceStats(String.format(CAMERA_INVERT_NEAR, GET));
         if (validateCameraProperty(invertNear)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_INVERT,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(invertNear, "get\r\ncamerainvert near ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_INVERT, "");
         }
-        String nearTracking = send(String.format(CAMERA_NEAR_TRACKING, GET));
+        String nearTracking = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING, GET));
         if (validateCameraProperty(nearTracking)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(nearTracking, "get\r\ncamera near tracking ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING, "");
         }
-        String trackingCalibrate = send(String.format(CAMERA_NEAR_TRACKING_CALIBRATE, GET));
+        String trackingCalibrate = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_CALIBRATE, GET));
         if (validateCameraProperty(trackingCalibrate)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_CALIBRATE,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingCalibrate, "get\r\ncameratracking near calibrate ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_CALIBRATE, "");
         }
-        String trackingFraming = send(String.format(CAMERA_NEAR_TRACKING_FRAMING, GET));
+        String trackingFraming = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_FRAMING, GET));
         if (validateCameraProperty(trackingCalibrate)) {
             advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_FRAMING, Arrays.asList("wide", "medium", "tight"),
                     StringUtils.getDataBetween(trackingFraming, "get\r\ncameratracking near framing ", LINE_BREAKER)));
             statistics.put(CAMERA_LABEL_TRACKING_FRAMING, "");
         }
-        String trackingMode = send(String.format(CAMERA_NEAR_TRACKING_MODE, GET));
+        String trackingMode = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_MODE, GET));
         if (validateCameraProperty(trackingMode)) {
             advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_MODE, Arrays.asList("off", "group", "speaker", "groupwithtransition"),
                     StringUtils.getDataBetween(trackingMode, "get\r\ncameratracking near mode ", LINE_BREAKER)));
             statistics.put(CAMERA_LABEL_TRACKING_MODE, "");
         }
-        String trackingParticipant = send(String.format(CAMERA_NEAR_TRACKING_PARTICIPANT, GET));
+        String trackingParticipant = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_PARTICIPANT, GET));
         if (validateCameraProperty(trackingParticipant)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_PARTICIPANT,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingParticipant, "get\r\ncameratracking near participant ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_PARTICIPANT, "");
         }
-        String trackingPip = send(String.format(CAMERA_NEAR_TRACKING_PIP, GET));
+        String trackingPip = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_PIP, GET));
         if (validateCameraProperty(trackingPip)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_PIP,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingPip, "get\r\ncameratracking near pip ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_PIP, "");
         }
-        String trackingWake = send(String.format(CAMERA_NEAR_TRACKING_WAKE, GET));
+        String trackingWake = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_WAKE, GET));
         if (validateCameraProperty(trackingWake)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_TRACKING_WAKE,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(trackingWake, "get\r\ncameratracking near wake ", LINE_BREAKER))));
             statistics.put(CAMERA_LABEL_TRACKING_WAKE, "");
         }
-        String trackingSpeed = send(String.format(CAMERA_NEAR_TRACKING_SPEED, GET));
+        String trackingSpeed = retrieveDeviceStats(String.format(CAMERA_NEAR_TRACKING_SPEED, GET));
         if (validateCameraProperty(trackingSpeed)) {
             advancedControllableProperties.add(createDropdown(CAMERA_LABEL_TRACKING_SPEED, Arrays.asList("off", "slow", "normal", "fast"),
                     StringUtils.getDataBetween(trackingSpeed, "get\r\ncameratracking near speed ", LINE_BREAKER)));
             statistics.put(CAMERA_LABEL_TRACKING_SPEED, "");
         }
-        String videoMute = send(String.format(VIDEOMUTE, GET));
+        String videoMute = retrieveDeviceStats(String.format(VIDEOMUTE, GET));
         if (validateCameraProperty(videoMute)) {
             advancedControllableProperties.add(createSwitch(CAMERA_LABEL_MUTE,
                     normalizeSwitchValueInternal(StringUtils.getDataBetween(videoMute, "get\r\nvideomute near ", LINE_BREAKER))));
@@ -745,7 +745,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private Map<String, Float> getCameraPosition() throws Exception {
-        String cameraPosition = send(CAMERA_NEAR_GETPOSITION);
+        String cameraPosition = retrieveDeviceStats(CAMERA_NEAR_GETPOSITION);
         Map<String, Float> cameraPositionProperties = new HashMap<>();
         if (validateCameraProperty(cameraPosition)) {
             Matcher sourceMatcher = Pattern.compile("(\\S?\\d{1,5})\\s(\\S?\\d{1,5})\\s(\\S?\\d{1,5})").matcher(cameraPosition);
@@ -820,7 +820,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private void populateDeviceData(Map<String, String> statistics) throws Exception {
-        String whoamiLines = send(WHOAMI);
+        String whoamiLines = retrieveDeviceStats(WHOAMI);
         if (StringUtils.isNullOrEmpty(whoamiLines, true)) {
             if (logger.isDebugEnabled()) {
                 logger.debug("Empty whoami command response, skipping.");
@@ -1291,6 +1291,23 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             }
         }
         return status;
+    }
+
+    /**
+     * Get the result of device command, if supported by the device
+     *
+     * @return {@link String} result of the command, or empty value if the command is not supported
+     */
+    private String retrieveDeviceStats(String command) {
+        String response = "";
+        try {
+            response = send(command);
+        } catch (Exception e) {
+            if (logger.isTraceEnabled()) {
+                logger.trace(String.format("This device does not support or recognize the %s command", command));
+            }
+        }
+        return response;
     }
 }
 
