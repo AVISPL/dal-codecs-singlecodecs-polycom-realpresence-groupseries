@@ -56,7 +56,7 @@ import com.avispl.symphony.api.dal.dto.monitor.VideoChannelStats;
  */
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class PolycomGroupSeriesTest {
-	private static final String host = "172.31.254.150";// "***REMOVED***";
+	private static final String host = "***REMOVED***";// "***REMOVED***";
 	private static final String user = "admin";
 	private static final String password = "1234";// "***REMOVED***";
 	private static final int port = 22;
