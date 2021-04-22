@@ -139,15 +139,15 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final int RETRY_INTERVAL_MILLISEC = 1000; // TODO extract into configurable property
 
     private static void cleanDisabledStats(ContentChannelStats stats) {
-        if (stats.getFrameRateRx() == 0.0 &&
+        if (Objects.equals(stats.getFrameRateRx(), 0.0) &&
                 (stats.getFrameSizeRx() == null || Objects.equals(stats.getFrameSizeRx(), NULL_STATISTIC))
-                && stats.getBitRateRx() == 0) {
+                && Objects.equals(stats.getBitRateRx(), 0)) {
             stats.setFrameRateRx(null);
             stats.setBitRateRx(null);
             stats.setPacketLossRx(null);
         }
-        if (stats.getFrameRateTx() == 0.0 && (stats.getFrameSizeTx() == null
-                || Objects.equals(stats.getFrameSizeTx(), NULL_STATISTIC)) && stats.getBitRateTx() == 0) {
+        if (Objects.equals(stats.getFrameRateTx(), 0.0) && (stats.getFrameSizeTx() == null
+                || Objects.equals(stats.getFrameSizeTx(), NULL_STATISTIC)) && Objects.equals(stats.getBitRateTx(), 0)) {
             stats.setFrameRateTx(null);
             stats.setBitRateTx(null);
             stats.setPacketLossTx(null);
