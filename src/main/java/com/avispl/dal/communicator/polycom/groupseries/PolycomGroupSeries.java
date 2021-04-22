@@ -790,7 +790,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private void populateAudioData(Map<String, String> statistics, List<AdvancedControllableProperty> advancedControllableProperties) throws Exception {
-        advancedControllableProperties.add(createSwitch(AUDIO_LABEL_MUTE, retrieveMuteStatus().equals(MuteStatus.Muted) ? 1 : 0));
+        advancedControllableProperties.add(createSwitch(AUDIO_LABEL_MUTE, Objects.equals(retrieveMuteStatus(), MuteStatus.Muted) ? 1 : 0));
         statistics.put(AUDIO_LABEL_MUTE, "");
 
         String volume = send(String.format(VOLUME, GET));
