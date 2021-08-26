@@ -60,7 +60,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final String PROTOCOL_CODE = "tcp";
 
     private static final String STATUS = "status";
-    private static final String UPTIME = "uptime get";
     private static final String WHOAMI = "whoami";
 
     private static final String VOLUME = "volume %s";
@@ -840,15 +839,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         addStatisticsProperty(statistics, "Device#H323Enabled", StringUtils.getDataBetween(whoamiLines, "H323 Enabled: ", LINE_BREAKER));
         addStatisticsProperty(statistics, "Device#HTTPEnabled", StringUtils.getDataBetween(whoamiLines, "HTTP Enabled: ", LINE_BREAKER));
         addStatisticsProperty(statistics, "Device#SNMPEnabled", StringUtils.getDataBetween(whoamiLines, "SNMP Enabled: ", LINE_BREAKER));
-
-        String uptime = send(UPTIME);
-        if (StringUtils.isNullOrEmpty(uptime, true)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug("Empty uptime command response, skipping.");
-            }
-            return;
-        }
-        addStatisticsProperty(statistics, "Device#Uptime", StringUtils.getDataBetween(uptime, "uptime get ", LINE_BREAKER));
     }
 
     /**
