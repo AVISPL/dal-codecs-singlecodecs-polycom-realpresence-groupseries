@@ -368,7 +368,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         populateDeviceData(extendedStatisticsData);
 
         populateAudioData(extendedStatisticsData, advancedControllableProperties);
-        populateCameraData(extendedStatisticsData, advancedControllableProperties);
 
         extendedStatistics.setStatistics(extendedStatisticsData);
         extendedStatistics.setControllableProperties(advancedControllableProperties);
@@ -386,6 +385,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         }
 
         statistics.setInCall(true);
+        populateCameraData(extendedStatisticsData, advancedControllableProperties);
         callStats = parseCallIdAndRemoteAddress(activeCallStatus);
         callStats.setRequestedCallRate(convertToInteger(activeCallStatus[4]));
 
