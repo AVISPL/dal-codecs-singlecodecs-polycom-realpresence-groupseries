@@ -19,19 +19,15 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
-import com.avispl.dal.communicator.polycom.groupseries.PolycomGroupSeries;
 import com.avispl.symphony.api.dal.control.call.CallController;
 import com.avispl.symphony.api.dal.dto.control.ControllableProperty;
 import com.avispl.symphony.api.dal.monitor.Monitorable;
 import com.avispl.symphony.dal.util.StringUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runners.MethodSorters;
 import org.mockito.Mockito;
 
@@ -74,7 +70,7 @@ public class PolycomGroupSeriesTest {
 
 	private static DialDevice getDialDevice() {
 		DialDevice device = new DialDevice();
-		device.setDialString(farSiteDialString);
+		device.setDialString("1125198839@vtc.avispl.com");
 		device.setCallSpeed(Integer.valueOf(1920));
 		device.setProtocol(Protocol.SIP);
 		return device;
@@ -145,9 +141,6 @@ public class PolycomGroupSeriesTest {
 		polycomGroupSeries.init();
 
 		farSiteDialString = "unittest_vmr@vnoc1.chicago";
-
-		Logger.getLogger(PolycomGroupSeries.class).setLevel(Level.OFF);
-
 	}
 
 	/**
