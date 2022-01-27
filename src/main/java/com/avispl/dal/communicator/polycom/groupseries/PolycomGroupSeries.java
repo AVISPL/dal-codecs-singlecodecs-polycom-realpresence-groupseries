@@ -138,15 +138,23 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final int RETRY_INTERVAL_MILLISEC = 1000; // TODO extract into configurable property
 
     private static void cleanDisabledStats(ContentChannelStats stats) {
-        if (Objects.equals(stats.getFrameRateRx(), 0.0) &&
-                (stats.getFrameSizeRx() == null || Objects.equals(stats.getFrameSizeRx(), NULL_STATISTIC))
-                && Objects.equals(stats.getBitRateRx(), 0)) {
+        Float frameRateRx = stats.getFrameRateRx();
+        String frameSizeRx = stats.getFrameSizeRx();
+        Integer bitRateRx = stats.getBitRateRx();
+        if ((null == frameRateRx || frameRateRx.floatValue() == 0.0) && (null == frameSizeRx || Objects.equals(frameSizeRx, NULL_STATISTIC))
+                && (null == bitRateRx || bitRateRx.intValue() == 0)) {
+
             stats.setFrameRateRx(null);
             stats.setBitRateRx(null);
             stats.setPacketLossRx(null);
         }
-        if (Objects.equals(stats.getFrameRateTx(), 0.0) && (stats.getFrameSizeTx() == null
-                || Objects.equals(stats.getFrameSizeTx(), NULL_STATISTIC)) && Objects.equals(stats.getBitRateTx(), 0)) {
+
+        Float frameRateTx = stats.getFrameRateTx();
+        String frameSizeTx = stats.getFrameSizeTx();
+        Integer bitRateTx = stats.getBitRateTx();
+        if ((null == frameRateTx || frameRateTx.floatValue() == 0.0) && (null == frameSizeTx || Objects.equals(frameSizeTx, NULL_STATISTIC))
+                && (null == bitRateTx || bitRateTx.intValue() == 0)) {
+
             stats.setFrameRateTx(null);
             stats.setBitRateTx(null);
             stats.setPacketLossTx(null);
