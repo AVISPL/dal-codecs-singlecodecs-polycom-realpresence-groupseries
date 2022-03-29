@@ -1229,13 +1229,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         registrationStatus.setH323Registered(false);
         registrationStatus.setSipRegistered(false);
 
-        if (StringUtils.isNullOrEmpty(status, true)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug("Empty status command response, skipping.");
-            }
-            return registrationStatus;
-        }
-
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
         String sipRegistrarIpString = send(SYSTEMSETTING_GET_SIPREGISTRARSERVER).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
         if (!StringUtils.isNullOrEmpty(sipRegistrarIpString, true)) {
