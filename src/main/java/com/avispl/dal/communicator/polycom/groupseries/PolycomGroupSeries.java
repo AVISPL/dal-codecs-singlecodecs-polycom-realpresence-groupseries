@@ -1226,12 +1226,8 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private RegistrationStatus extractRegistrationStatus(String status) throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
-        if (StringUtils.isNullOrEmpty(status, true)) {
-            if (logger.isDebugEnabled()) {
-                logger.debug("Empty status command response, skipping.");
-            }
-            return registrationStatus;
-        }
+        registrationStatus.setH323Registered(false);
+        registrationStatus.setSipRegistered(false);
 
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
         String sipRegistrarIpString = send(SYSTEMSETTING_GET_SIPREGISTRARSERVER).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
@@ -1244,6 +1240,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         if (!StringUtils.isNullOrEmpty(gatekeeperIpString, true)) {
             registrationStatus.setH323Gatekeeper(gatekeeperIpString);
         }
+
         String gateKeeper = StringUtils.getDataBetween(status, "gatekeeper ", LINE_BREAKER);
         if (gateKeeper != null) {
             switch (gateKeeper) {
@@ -1255,6 +1252,11 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                     registrationStatus.setH323Registered(false);
                     break;
                 }
+                default:
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("H323 gatekeeper status is not available: " + gateKeeper);
+                    }
+                    break;
             }
         }
         String registrar = StringUtils.getDataBetween(status, "sipserver ", LINE_BREAKER);
@@ -1268,6 +1270,11 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                     registrationStatus.setSipRegistered(false);
                     break;
                 }
+                default:
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("SIP registrar status is not available: " + registrar);
+                    }
+                    break;
             }
         }
 
