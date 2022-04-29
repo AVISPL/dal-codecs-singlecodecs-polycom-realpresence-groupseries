@@ -23,6 +23,7 @@ import org.springframework.util.CollectionUtils;
 
 import javax.security.auth.login.FailedLoginException;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -136,6 +137,25 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final String NULL_STATISTIC = "---";
     private static final int MAX_STATUS_POLL_ATTEMPT = 20; // TODO extract into configurable property
     private static final int RETRY_INTERVAL_MILLISEC = 1000; // TODO extract into configurable property
+
+    /**
+     * Timestamp of the last control operation, used to determine whether we need to wait
+     * for {@link #CONTROL_OPERATION_COOLDOWN_MS} before collecting new statistics
+     */
+    private long latestControlTimestamp;
+
+    /**
+     * Cooldown period for control operation. Most control operations (toggle/slider based in this case) may be
+     * requested multiple times in a row. Normally, a control operation would trigger an emergency delivery action,
+     * which is not wanted in this case - such control operations will stack multiple statistics retrieval calls,
+     * while instead we can define a cooldown period, so multiple controls operations will be stacked within this
+     * period and the control states are modified within the {@link #localStatistics} variable.
+     */
+    private static final int CONTROL_OPERATION_COOLDOWN_MS = 5000;
+
+    ReentrantLock commandOperationLock = new ReentrantLock();
+    private ExtendedStatistics localStatistics;
+    private EndpointStatistics localEndpointStatistics;
 
     private static void cleanDisabledStats(ContentChannelStats stats) {
         Float frameRateRx = stats.getFrameRateRx();
@@ -365,305 +385,334 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     @Override
     public List<Statistics> getMultipleStatistics() throws Exception {
-        EndpointStatistics statistics = new EndpointStatistics();
+        final EndpointStatistics blankEndpointStatistics = new EndpointStatistics();
+        EndpointStatistics endpointStatistics = new EndpointStatistics();
         ExtendedStatistics extendedStatistics = new ExtendedStatistics();
         Map<String, String> extendedStatisticsData = new HashMap<>();
         List<AdvancedControllableProperty> advancedControllableProperties = new ArrayList<>();
 
-        String deviceStatus = retrieveStatus();
+        commandOperationLock.lock();
+        try {
+            if (isValidControlCoolDown() && localStatistics != null && localEndpointStatistics != null) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Device is occupied. Skipping statistics refresh call.");
+                }
+                extendedStatistics.setStatistics(localStatistics.getStatistics());
+                extendedStatistics.setControllableProperties(localStatistics.getControllableProperties());
 
-        extractDeviceStatus(extendedStatisticsData, deviceStatus);
-        populateDeviceData(extendedStatisticsData);
+                endpointStatistics.setInCall(localEndpointStatistics.isInCall());
+                endpointStatistics.setCallStats(localEndpointStatistics.getCallStats());
+                endpointStatistics.setVideoChannelStats(localEndpointStatistics.getVideoChannelStats());
+                endpointStatistics.setAudioChannelStats(localEndpointStatistics.getAudioChannelStats());
 
-        populateAudioData(extendedStatisticsData, advancedControllableProperties);
+                return Arrays.asList(extendedStatistics, endpointStatistics);
+            }
 
-        extendedStatistics.setStatistics(extendedStatisticsData);
-        extendedStatistics.setControllableProperties(advancedControllableProperties);
+            String deviceStatus = retrieveStatus();
 
-        CallStats callStats = null;
+            extractDeviceStatus(extendedStatisticsData, deviceStatus);
+            populateDeviceData(extendedStatisticsData);
 
-        // Add code to return registration status
-        RegistrationStatus registrationStats = extractRegistrationStatus(deviceStatus);
-        statistics.setRegistrationStatus(registrationStats);
+            populateAudioData(extendedStatisticsData, advancedControllableProperties);
 
-        String[] activeCallStatus = retrieveRawCallStatistics();
-        if (null == activeCallStatus) {
-            statistics.setInCall(false);
-            return Arrays.asList(statistics, extendedStatistics);
-        }
+            extendedStatistics.setStatistics(extendedStatisticsData);
+            extendedStatistics.setControllableProperties(advancedControllableProperties);
 
-        statistics.setInCall(true);
-        populateCameraData(extendedStatisticsData, advancedControllableProperties);
-        callStats = parseCallIdAndRemoteAddress(activeCallStatus);
-        callStats.setRequestedCallRate(convertToInteger(activeCallStatus[4]));
+            CallStats callStats = null;
 
-        AudioChannelStats audioChannelStats = new AudioChannelStats();
-        VideoChannelStats videoChannelStats = new VideoChannelStats();
-        ContentChannelStats contentChannelStats = new ContentChannelStats();
+            // Add code to return registration status
+            RegistrationStatus registrationStats = extractRegistrationStatus(deviceStatus);
+            endpointStatistics.setRegistrationStatus(registrationStats);
 
-        audioChannelStats.setMuteTx(send(GET_MUTE_STATUS).contains(MUTE_STATUS));
+            String[] activeCallStatus = retrieveRawCallStatistics();
+            if (null == activeCallStatus) {
+                endpointStatistics.setInCall(false);
+                localEndpointStatistics = endpointStatistics;
+                localStatistics = extendedStatistics;
+                return Arrays.asList(endpointStatistics, extendedStatistics);
+            }
 
-        String networkStats = send(GET_NETWORK_STATS);
-        if (networkStats != null && networkStats.length() > 0) {
-            // StringTokenizer will create an "array" that is split on the Space character and End Of Line characters.
-            // We can loop through the array via "hasMoreTokens". If the entry contains a ":" character, it contains data
-            StringTokenizer networkTokenizer = new StringTokenizer(networkStats);
-            while (networkTokenizer.hasMoreTokens()) {
-                String networkToken = networkTokenizer.nextToken();
+            endpointStatistics.setInCall(true);
+            populateCameraData(extendedStatisticsData, advancedControllableProperties);
+            callStats = parseCallIdAndRemoteAddress(activeCallStatus);
+            callStats.setRequestedCallRate(convertToInteger(activeCallStatus[4]));
 
-                if (networkToken.contains(TOKEN_SEPERATOR)) {
-                    String[] tokenItems = networkToken.split(TOKEN_SEPERATOR);
-                    if (tokenItems.length > 1) { // check if we have key and value
-                        String tokenKey = tokenItems[0];
-                        String tokenValue = tokenItems[1];
+            AudioChannelStats audioChannelStats = new AudioChannelStats();
+            VideoChannelStats videoChannelStats = new VideoChannelStats();
+            ContentChannelStats contentChannelStats = new ContentChannelStats();
 
-                        switch (tokenKey) {
-                            case VIDEO_CODEC_CODE:
-                                videoChannelStats.setCodec(tokenValue);
-                                break;
+            audioChannelStats.setMuteTx(send(GET_MUTE_STATUS).contains(MUTE_STATUS));
 
-                            case AUDIO_CODEC_CODE:
-                                audioChannelStats.setCodec(tokenValue);
-                                break;
+            String networkStats = send(GET_NETWORK_STATS);
+            if (networkStats != null && networkStats.length() > 0) {
+                // StringTokenizer will create an "array" that is split on the Space character and End Of Line characters.
+                // We can loop through the array via "hasMoreTokens". If the entry contains a ":" character, it contains data
+                StringTokenizer networkTokenizer = new StringTokenizer(networkStats);
+                while (networkTokenizer.hasMoreTokens()) {
+                    String networkToken = networkTokenizer.nextToken();
 
-                            case CONTENT_RX_CODEC_CODE:
-                                contentChannelStats.setCodec(tokenValue);
-                                break;
+                    if (networkToken.contains(TOKEN_SEPERATOR)) {
+                        String[] tokenItems = networkToken.split(TOKEN_SEPERATOR);
+                        if (tokenItems.length > 1) { // check if we have key and value
+                            String tokenKey = tokenItems[0];
+                            String tokenValue = tokenItems[1];
 
-                            case PROTOCOL_CODE:
-                                callStats.setProtocol(tokenValue);
-                                break;
+                            switch (tokenKey) {
+                                case VIDEO_CODEC_CODE:
+                                    videoChannelStats.setCodec(tokenValue);
+                                    break;
 
-                            case PERCENT_TX_PACKETLOSS_CODE:
-                                callStats.setPercentPacketLossTx(convertToFloat(tokenValue));
-                                break;
+                                case AUDIO_CODEC_CODE:
+                                    audioChannelStats.setCodec(tokenValue);
+                                    break;
 
-                            case TOTAL_TX_PACKETLOSS_CODE:
-                                callStats.setTotalPacketLossTx(convertToInteger(tokenValue));
-                                break;
+                                case CONTENT_RX_CODEC_CODE:
+                                    contentChannelStats.setCodec(tokenValue);
+                                    break;
 
-                            case VIDEO_RX_FRAME_SIZE_CODE:
-                                if (tokenValue.contains(X_CHARACTER)) {
-                                    videoChannelStats.setFrameSizeRx(tokenValue.replace(LOWER_CASE_P, ""));
-                                } else {
-                                    videoChannelStats.setFrameSizeRx(tokenValue);
-                                }
-                                break;
+                                case PROTOCOL_CODE:
+                                    callStats.setProtocol(tokenValue);
+                                    break;
 
-                            case VIDEO_TX_FRAME_SIZE_CODE:
-                                if (tokenValue.contains(X_CHARACTER)) {
-                                    videoChannelStats.setFrameSizeTx(tokenValue.replace(LOWER_CASE_P, ""));
-                                } else {
-                                    videoChannelStats.setFrameSizeTx(tokenValue);
-                                }
-                                break;
+                                case PERCENT_TX_PACKETLOSS_CODE:
+                                    callStats.setPercentPacketLossTx(convertToFloat(tokenValue));
+                                    break;
 
-                            default:
-                                break;
+                                case TOTAL_TX_PACKETLOSS_CODE:
+                                    callStats.setTotalPacketLossTx(convertToInteger(tokenValue));
+                                    break;
+
+                                case VIDEO_RX_FRAME_SIZE_CODE:
+                                    if (tokenValue.contains(X_CHARACTER)) {
+                                        videoChannelStats.setFrameSizeRx(tokenValue.replace(LOWER_CASE_P, ""));
+                                    } else {
+                                        videoChannelStats.setFrameSizeRx(tokenValue);
+                                    }
+                                    break;
+
+                                case VIDEO_TX_FRAME_SIZE_CODE:
+                                    if (tokenValue.contains(X_CHARACTER)) {
+                                        videoChannelStats.setFrameSizeTx(tokenValue.replace(LOWER_CASE_P, ""));
+                                    } else {
+                                        videoChannelStats.setFrameSizeTx(tokenValue);
+                                    }
+                                    break;
+
+                                default:
+                                    break;
+                            }
                         }
                     }
                 }
+                if (Objects.equals(videoChannelStats.getCodec(), NULL_STATISTIC)
+                        && Objects.equals(audioChannelStats.getCodec(), NULL_STATISTIC)
+                        && Objects.equals(callStats.getProtocol(), NULL_STATISTIC)
+                        && callStats.getPercentPacketLossTx() == null
+                        && Objects.equals(videoChannelStats.getFrameSizeRx(), NULL_STATISTIC)
+                        && Objects.equals(videoChannelStats.getFrameSizeTx(), NULL_STATISTIC)) {
+                    localEndpointStatistics = blankEndpointStatistics;
+                    return singletonList(blankEndpointStatistics);
+                }
+            } else {
+                localEndpointStatistics = blankEndpointStatistics;
+                return singletonList(blankEndpointStatistics);
             }
-            if (Objects.equals(videoChannelStats.getCodec(), NULL_STATISTIC)
-                    && Objects.equals(audioChannelStats.getCodec(), NULL_STATISTIC)
-                    && Objects.equals(callStats.getProtocol(), NULL_STATISTIC)
-                    && callStats.getPercentPacketLossTx() == null
-                    && Objects.equals(videoChannelStats.getFrameSizeRx(), NULL_STATISTIC)
-                    && Objects.equals(videoChannelStats.getFrameSizeTx(), NULL_STATISTIC)) {
-                return singletonList(new EndpointStatistics());
-            }
-        } else {
-            return singletonList(new EndpointStatistics());
-        }
 
-        String advancedStats = send(GET_ADVANCED_STATS);
-        if (advancedStats != null && advancedStats.length() > 0) {
-            // Some stats are used twice, set to local variable
-            Integer audioTxRate = null;
-            Integer audioRxRate = null;
-            Integer videoTxRate = null;
-            Integer videoRxRate = null;
-            Integer contentTxRate = null;
-            Integer contentRxRate = null;
+            String advancedStats = send(GET_ADVANCED_STATS);
+            if (advancedStats != null && advancedStats.length() > 0) {
+                // Some stats are used twice, set to local variable
+                Integer audioTxRate = null;
+                Integer audioRxRate = null;
+                Integer videoTxRate = null;
+                Integer videoRxRate = null;
+                Integer contentTxRate = null;
+                Integer contentRxRate = null;
 
-            // StringTokenizer will create an "array" that is split on the Space character and End Of Line characters.
-            // We can loop through the array via "hasMoreTokens". If the entry contains a ":" character, it contains data
-            StringTokenizer stringTokenizer = new StringTokenizer(advancedStats);
+                // StringTokenizer will create an "array" that is split on the Space character and End Of Line characters.
+                // We can loop through the array via "hasMoreTokens". If the entry contains a ":" character, it contains data
+                StringTokenizer stringTokenizer = new StringTokenizer(advancedStats);
 
-            while (stringTokenizer.hasMoreTokens()) {
-                String token = stringTokenizer.nextToken();
+                while (stringTokenizer.hasMoreTokens()) {
+                    String token = stringTokenizer.nextToken();
 
-                if (token.contains(TOKEN_SEPERATOR)) {
-                    String[] reportedStats = token.split(TOKEN_SEPERATOR);
-                    if (reportedStats.length > 1) {
-                        // check if we have key and value
-                        String reportedKey = reportedStats[0];
-                        String reportedValue = reportedStats[1];
+                    if (token.contains(TOKEN_SEPERATOR)) {
+                        String[] reportedStats = token.split(TOKEN_SEPERATOR);
+                        if (reportedStats.length > 1) {
+                            // check if we have key and value
+                            String reportedKey = reportedStats[0];
+                            String reportedValue = reportedStats[1];
 
-                        switch (reportedKey) {
-                            case AUDIO_TX_RATE_CODE:
-                                audioTxRate = convertToInteger(reportedValue);
-                                break;
+                            switch (reportedKey) {
+                                case AUDIO_TX_RATE_CODE:
+                                    audioTxRate = convertToInteger(reportedValue);
+                                    break;
 
-                            case AUDIO_RX_RATE_CODE:
-                                audioRxRate = convertToInteger(reportedValue);
-                                break;
+                                case AUDIO_RX_RATE_CODE:
+                                    audioRxRate = convertToInteger(reportedValue);
+                                    break;
 
-                            case VIDEO_RX_RATE_CODE:
-                                videoRxRate = convertToInteger(reportedValue);
-                                break;
+                                case VIDEO_RX_RATE_CODE:
+                                    videoRxRate = convertToInteger(reportedValue);
+                                    break;
 
-                            case VIDEO_TX_RATE_CODE:
-                                videoTxRate = convertToInteger(reportedValue);
-                                break;
+                                case VIDEO_TX_RATE_CODE:
+                                    videoTxRate = convertToInteger(reportedValue);
+                                    break;
 
-                            case CONTENT_RX_RATE_CODE:
-                                contentRxRate = convertToInteger(reportedValue);
-                                break;
+                                case CONTENT_RX_RATE_CODE:
+                                    contentRxRate = convertToInteger(reportedValue);
+                                    break;
 
-                            case CONTENT_TX_RATE_CODE:
-                                contentTxRate = convertToInteger(reportedValue);
-                                break;
+                                case CONTENT_TX_RATE_CODE:
+                                    contentTxRate = convertToInteger(reportedValue);
+                                    break;
 
-                            case AUDIO_TX_JITER_CODE:
-                                audioChannelStats.setJitterTx(convertToFloat(reportedValue));
-                                break;
+                                case AUDIO_TX_JITER_CODE:
+                                    audioChannelStats.setJitterTx(convertToFloat(reportedValue));
+                                    break;
 
-                            case AUDIO_RX_JITTER_CODE:
-                                audioChannelStats.setJitterRx(convertToFloat(reportedValue));
-                                break;
+                                case AUDIO_RX_JITTER_CODE:
+                                    audioChannelStats.setJitterRx(convertToFloat(reportedValue));
+                                    break;
 
-                            case AUDIO_TX_PACKETLOSS_CODE:
-                                audioChannelStats.setPacketLossTx(convertToInteger(reportedValue));
-                                break;
+                                case AUDIO_TX_PACKETLOSS_CODE:
+                                    audioChannelStats.setPacketLossTx(convertToInteger(reportedValue));
+                                    break;
 
-                            case AUDIO_RX_PACKETLOSS_CODE:
-                                audioChannelStats.setPacketLossRx(convertToInteger(reportedValue));
-                                break;
+                                case AUDIO_RX_PACKETLOSS_CODE:
+                                    audioChannelStats.setPacketLossRx(convertToInteger(reportedValue));
+                                    break;
 
-                            case VIDEO_TX_JITTER_CODE:
-                                videoChannelStats.setJitterTx(convertToFloat(reportedValue));
-                                break;
+                                case VIDEO_TX_JITTER_CODE:
+                                    videoChannelStats.setJitterTx(convertToFloat(reportedValue));
+                                    break;
 
-                            case VIDEO_RX_JITTER_CODE:
-                                videoChannelStats.setJitterRx(convertToFloat(reportedValue));
-                                break;
+                                case VIDEO_RX_JITTER_CODE:
+                                    videoChannelStats.setJitterRx(convertToFloat(reportedValue));
+                                    break;
 
-                            case VIDEO_TX_PACKETLOSS_CODE:
-                                videoChannelStats.setPacketLossTx(convertToInteger(reportedValue));
-                                break;
+                                case VIDEO_TX_PACKETLOSS_CODE:
+                                    videoChannelStats.setPacketLossTx(convertToInteger(reportedValue));
+                                    break;
 
-                            case VIDEO_RX_PACKETLOSS_CODE:
-                                videoChannelStats.setPacketLossRx(convertToInteger(reportedValue));
-                                break;
+                                case VIDEO_RX_PACKETLOSS_CODE:
+                                    videoChannelStats.setPacketLossRx(convertToInteger(reportedValue));
+                                    break;
 
-                            case VIDEO_TX_BITRATE_CODE:
-                                videoChannelStats.setBitRateTx(convertToInteger(reportedValue));
-                                break;
+                                case VIDEO_TX_BITRATE_CODE:
+                                    videoChannelStats.setBitRateTx(convertToInteger(reportedValue));
+                                    break;
 
-                            case VIDEO_RX_BITRATE_CODE:
-                                videoChannelStats.setBitRateRx(convertToInteger(reportedValue));
-                                break;
+                                case VIDEO_RX_BITRATE_CODE:
+                                    videoChannelStats.setBitRateRx(convertToInteger(reportedValue));
+                                    break;
 
-                            case VIDEO_TX_FRAMERATE_CODE:
-                                videoChannelStats.setFrameRateTx(convertToFloat(reportedValue));
-                                break;
+                                case VIDEO_TX_FRAMERATE_CODE:
+                                    videoChannelStats.setFrameRateTx(convertToFloat(reportedValue));
+                                    break;
 
-                            case VIDEO_RX_FRAMERATE_CODE:
-                                videoChannelStats.setFrameRateRx(convertToFloat(reportedValue));
-                                break;
+                                case VIDEO_RX_FRAMERATE_CODE:
+                                    videoChannelStats.setFrameRateRx(convertToFloat(reportedValue));
+                                    break;
 
-                            case CONTENT_TX_PACKETLOSS_CODE:
-                                contentChannelStats.setPacketLossTx(convertToInteger(reportedValue));
-                                break;
+                                case CONTENT_TX_PACKETLOSS_CODE:
+                                    contentChannelStats.setPacketLossTx(convertToInteger(reportedValue));
+                                    break;
 
-                            case CONTENT_RX_PACKETLOSS_CODE:
-                                contentChannelStats.setPacketLossRx(convertToInteger(reportedValue));
-                                break;
+                                case CONTENT_RX_PACKETLOSS_CODE:
+                                    contentChannelStats.setPacketLossRx(convertToInteger(reportedValue));
+                                    break;
 
-                            case CONTENT_TX_RATE_USED_CODE:
-                                contentChannelStats.setBitRateTx(convertToInteger(reportedValue));
-                                break;
+                                case CONTENT_TX_RATE_USED_CODE:
+                                    contentChannelStats.setBitRateTx(convertToInteger(reportedValue));
+                                    break;
 
-                            case CONTENT_RX_RATE_USED_CODE:
-                                contentChannelStats.setBitRateRx(convertToInteger(reportedValue));
-                                break;
+                                case CONTENT_RX_RATE_USED_CODE:
+                                    contentChannelStats.setBitRateRx(convertToInteger(reportedValue));
+                                    break;
 
-                            case CONTENT_TX_FRAMERATE_CODE:
-                                contentChannelStats.setFrameRateTx(convertToFloat(reportedValue));
-                                break;
+                                case CONTENT_TX_FRAMERATE_CODE:
+                                    contentChannelStats.setFrameRateTx(convertToFloat(reportedValue));
+                                    break;
 
-                            case CONTENT_RX_FRAMERATE_CODE:
-                                contentChannelStats.setFrameRateRx(convertToFloat(reportedValue));
-                                break;
+                                case CONTENT_RX_FRAMERATE_CODE:
+                                    contentChannelStats.setFrameRateRx(convertToFloat(reportedValue));
+                                    break;
 
-                            default:
-                                break;
+                                default:
+                                    break;
+                            }
                         }
                     }
                 }
+
+                if (videoChannelStats.getBitRateRx() == null
+                        && videoChannelStats.getBitRateTx() == null
+                        && videoChannelStats.getJitterTx() == null
+                        && videoChannelStats.getPacketLossRx() == null
+                        && videoChannelStats.getPacketLossTx() == null
+                        && videoChannelStats.getFrameRateRx() == null
+                        && videoChannelStats.getFrameRateTx() == null
+                        && videoChannelStats.getJitterRx() == null
+                        && audioChannelStats.getBitRateTx() == null
+                        && audioChannelStats.getBitRateRx() == null
+                        && audioChannelStats.getJitterRx() == null
+                        && audioChannelStats.getJitterTx() == null
+                        && audioChannelStats.getPacketLossRx() == null
+                        && audioChannelStats.getPacketLossTx() == null
+                        && contentChannelStats.getBitRateRx() == null
+                        && contentChannelStats.getBitRateTx() == null
+                        && contentChannelStats.getPacketLossRx() == null
+                        && contentChannelStats.getPacketLossTx() == null
+                        && contentChannelStats.getFrameRateRx() == null
+                        && contentChannelStats.getFrameRateTx() == null) {
+                    localEndpointStatistics = blankEndpointStatistics;
+                    return singletonList(blankEndpointStatistics);
+                }
+
+                // calculate transmit rate (one of the variables may be null)
+                callStats.setCallRateTx(
+                        Optional.ofNullable(videoTxRate).orElse(0)
+                                + Optional.ofNullable(audioTxRate).orElse(0)
+                                + Optional.ofNullable(contentTxRate).orElse(0));
+
+                // calculate receive rate (one of the variables may be null)
+                callStats.setCallRateRx(
+                        Optional.ofNullable(videoRxRate).orElse(0)
+                                + Optional.ofNullable(audioRxRate).orElse(0)
+                                + Optional.ofNullable(contentRxRate).orElse(0));
+
+                audioChannelStats.setBitRateRx(audioRxRate);
+                audioChannelStats.setBitRateTx(audioTxRate);
+
+                videoChannelStats.setBitRateRx(videoRxRate);
+                videoChannelStats.setBitRateTx(videoTxRate);
+
+                contentChannelStats.setBitRateRx(contentRxRate);
+                contentChannelStats.setBitRateTx(contentTxRate);
+            }
+            endpointStatistics.setCallStats(callStats);
+            endpointStatistics.setAudioChannelStats(audioChannelStats);
+            // check video statistics if it is audio only call then we are not adding video statistics to the statistics
+            // below is example of statistics in audion only call: codec bitraterx bitratetx jitterrx jittertx packetlossrx
+            // packetlosstx frameraterx frameratetx framesizerx framesizetx videomutetx --- 0 0 0 0 0 0 0 0 --- ---
+            if (isNotEmpty(videoChannelStats)) {
+                endpointStatistics.setVideoChannelStats(videoChannelStats);
             }
 
-            if (videoChannelStats.getBitRateRx() == null
-                    && videoChannelStats.getBitRateTx() == null
-                    && videoChannelStats.getJitterTx() == null
-                    && videoChannelStats.getPacketLossRx() == null
-                    && videoChannelStats.getPacketLossTx() == null
-                    && videoChannelStats.getFrameRateRx() == null
-                    && videoChannelStats.getFrameRateTx() == null
-                    && videoChannelStats.getJitterRx() == null
-                    && audioChannelStats.getBitRateTx() == null
-                    && audioChannelStats.getBitRateRx() == null
-                    && audioChannelStats.getJitterRx() == null
-                    && audioChannelStats.getJitterTx() == null
-                    && audioChannelStats.getPacketLossRx() == null
-                    && audioChannelStats.getPacketLossTx() == null
-                    && contentChannelStats.getBitRateRx() == null
-                    && contentChannelStats.getBitRateTx() == null
-                    && contentChannelStats.getPacketLossRx() == null
-                    && contentChannelStats.getPacketLossTx() == null
-                    && contentChannelStats.getFrameRateRx() == null
-                    && contentChannelStats.getFrameRateTx() == null) {
-                return singletonList(new EndpointStatistics());
+            //check no content sharing
+            if (isNotEmpty(contentChannelStats)) {
+                cleanDisabledStats(contentChannelStats);
+                endpointStatistics.setContentChannelStats(contentChannelStats);
             }
 
-            // calculate transmit rate (one of the variables may be null)
-            callStats.setCallRateTx(
-                    Optional.ofNullable(videoTxRate).orElse(0)
-                            + Optional.ofNullable(audioTxRate).orElse(0)
-                            + Optional.ofNullable(contentTxRate).orElse(0));
-
-            // calculate receive rate (one of the variables may be null)
-            callStats.setCallRateRx(
-                    Optional.ofNullable(videoRxRate).orElse(0)
-                            + Optional.ofNullable(audioRxRate).orElse(0)
-                            + Optional.ofNullable(contentRxRate).orElse(0));
-
-            audioChannelStats.setBitRateRx(audioRxRate);
-            audioChannelStats.setBitRateTx(audioTxRate);
-
-            videoChannelStats.setBitRateRx(videoRxRate);
-            videoChannelStats.setBitRateTx(videoTxRate);
-
-            contentChannelStats.setBitRateRx(contentRxRate);
-            contentChannelStats.setBitRateTx(contentTxRate);
-        }
-        statistics.setCallStats(callStats);
-        statistics.setAudioChannelStats(audioChannelStats);
-        // check video statistics if it is audio only call then we are not adding video statistics to the statistics
-        // below is example of statistics in audion only call: codec bitraterx bitratetx jitterrx jittertx packetlossrx
-        // packetlosstx frameraterx frameratetx framesizerx framesizetx videomutetx --- 0 0 0 0 0 0 0 0 --- ---
-        if (isNotEmpty(videoChannelStats)) {
-            statistics.setVideoChannelStats(videoChannelStats);
+            localStatistics = extendedStatistics;
+            localEndpointStatistics = endpointStatistics;
+        } finally {
+            commandOperationLock.unlock();
         }
 
-        //check no content sharing
-        if (isNotEmpty(contentChannelStats)) {
-            cleanDisabledStats(contentChannelStats);
-            statistics.setContentChannelStats(contentChannelStats);
-        }
-
-        return Arrays.asList(statistics, extendedStatistics);
+        return Arrays.asList(endpointStatistics, extendedStatistics);
     }
 
     private void populateCameraData(Map<String, String> statistics, List<AdvancedControllableProperty> advancedControllableProperties) throws Exception {
@@ -966,6 +1015,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             command += " " + protocol.name().toLowerCase();
         }
         send(command);
+        updateLatestControlTimestamp();
 		/*		Dials a video call number dialstr1 at speed of type
 				h323. Requires the parameters "speed" and "dialstr".
 				Allows the user to automatically dial a number. .
@@ -999,33 +1049,44 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     public void hangup(String callId) throws Exception {
         // hangup all
         // hangup video [callid]
-        String command = null;
-        if (StringUtils.isNullOrEmpty(callId, true)) {
-            command = HANGUP_ALL;
-        } else {
-            command = "hangup video " + callId;
+        commandOperationLock.lock();
+        try {
+            String command = null;
+            if (StringUtils.isNullOrEmpty(callId, true)) {
+                command = HANGUP_ALL;
+            } else {
+                command = "hangup video " + callId;
+            }
+            send(command);
+            updateLatestControlTimestamp();
+        } finally {
+            commandOperationLock.unlock();
         }
-        send(command);
     }
 
     @Override
     public CallStatus retrieveCallStatus(String callId) throws Exception {
-        CallStatus callStatus = new CallStatus();
-        CallStats callStats = parseCallIdAndRemoteAddress(retrieveRawCallStatistics());
-        if (null != callStats) {
-            String currentCallId = callStats.getCallId();
-            if (StringUtils.isNullOrEmpty(callId, true) || !StringUtils.isNullOrEmpty(currentCallId, true) && currentCallId.equals(callId)) {
-                callStatus.setCallId(currentCallId);
-                callStatus.setCallStatusState(CallStatusState.Connected);
-            } else {
-                callStatus.setCallId(callId);
-                callStatus.setCallStatusState(CallStatusState.Disconnected);
+        commandOperationLock.lock();
+        try {
+            CallStatus callStatus = new CallStatus();
+            CallStats callStats = parseCallIdAndRemoteAddress(retrieveRawCallStatistics());
+            if (null != callStats) {
+                String currentCallId = callStats.getCallId();
+                if (StringUtils.isNullOrEmpty(callId, true) || !StringUtils.isNullOrEmpty(currentCallId, true) && currentCallId.equals(callId)) {
+                    callStatus.setCallId(currentCallId);
+                    callStatus.setCallStatusState(CallStatusState.Connected);
+                } else {
+                    callStatus.setCallId(callId);
+                    callStatus.setCallStatusState(CallStatusState.Disconnected);
+                }
+                return callStatus;
             }
+            callStatus.setCallId(callId);
+            callStatus.setCallStatusState(CallStatusState.Disconnected);
             return callStatus;
+        } finally {
+            commandOperationLock.unlock();
         }
-        callStatus.setCallId(callId);
-        callStatus.setCallStatusState(CallStatusState.Disconnected);
-        return callStatus;
     }
 
     /**
@@ -1033,13 +1094,18 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     @Override
     public MuteStatus retrieveMuteStatus() throws Exception {
-        String responseMuteStatus = send(GET_MUTE_STATUS);
-        if (responseMuteStatus.contains(MUTE_STATUS) || responseMuteStatus.contains(MUTE_NEAR_ON)) {
-            return MuteStatus.Muted;
-        } else if (responseMuteStatus.contains(MUTE_NEAR_OFF)) {
-            return MuteStatus.Unmuted;
-        } else {
-            return null;
+        commandOperationLock.lock();
+        try {
+            String responseMuteStatus = send(GET_MUTE_STATUS);
+            if (responseMuteStatus.contains(MUTE_STATUS) || responseMuteStatus.contains(MUTE_NEAR_ON)) {
+                return MuteStatus.Muted;
+            } else if (responseMuteStatus.contains(MUTE_NEAR_OFF)) {
+                return MuteStatus.Unmuted;
+            } else {
+                return null;
+            }
+        } finally {
+            commandOperationLock.unlock();
         }
     }
 
@@ -1056,7 +1122,13 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     @Override
     public void mute() throws Exception {
-        send(MUTE_NEAR_ON);
+        commandOperationLock.lock();
+        try {
+            send(MUTE_NEAR_ON);
+            updateLatestControlTimestamp();
+        } finally {
+            commandOperationLock.unlock();
+        }
     }
 
     /**
@@ -1064,74 +1136,87 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     @Override
     public void unmute() throws Exception {
-        send(MUTE_NEAR_OFF);
+        commandOperationLock.lock();
+        try {
+            send(MUTE_NEAR_OFF);
+            updateLatestControlTimestamp();
+        } finally {
+            commandOperationLock.unlock();
+        }
     }
-
 
     @Override
     public void controlProperty(ControllableProperty controllableProperty) throws Exception {
         String property = controllableProperty.getProperty();
         String value = String.valueOf(controllableProperty.getValue());
 
-        switch (property) {
-            case AUDIO_LABEL_VOLUME:
-                send(String.format(VOLUME, SET) + removeDecimalPoint(value));
-                break;
-            case AUDIO_LABEL_MUTE:
-                if ("0".equals(value)) {
-                    unmute();
-                } else {
-                    mute();
-                }
-                break;
-            case CAMERA_LABEL_PAN:
-                Map<String, Float> cameraPosition = getCameraPosition();
-                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(value),
-                        removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(String.valueOf(cameraPosition.get("Zoom")))));
-                break;
-            case CAMERA_LABEL_TILT:
-                cameraPosition = getCameraPosition();
-                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition.get("Pan"))),
-                        removeDecimalPoint(value), removeDecimalPoint(String.valueOf(cameraPosition.get("Zoom")))));
-                break;
-            case CAMERA_LABEL_ZOOM:
-                cameraPosition = getCameraPosition();
-                send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition.get("Pan"))),
-                        removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(value)));
-                break;
-            case CAMERA_LABEL_MUTE:
-                send(String.format(VIDEOMUTE, normalizeSwitchValueExternal(value)));
-                break;
-            case CAMERA_LABEL_INVERT:
-                send(String.format(CAMERA_INVERT_NEAR, normalizeSwitchValueExternal(value)));
-                break;
-            case CAMERA_LABEL_TRACKING:
-                send(String.format(CAMERA_NEAR_TRACKING, normalizeSwitchValueExternal(value)));
-                break;
-            case CAMERA_LABEL_TRACKING_CALIBRATE:
-                send(String.format(CAMERA_NEAR_TRACKING_CALIBRATE, normalizeSwitchValueExternal(value)));
-                break;
-            case CAMERA_LABEL_TRACKING_FRAMING:
-                send(String.format(CAMERA_NEAR_TRACKING_FRAMING, value));
-                break;
-            case CAMERA_LABEL_TRACKING_MODE:
-                send(String.format(CAMERA_NEAR_TRACKING_MODE, value));
-                break;
-            case CAMERA_LABEL_TRACKING_PARTICIPANT:
-                send(String.format(CAMERA_NEAR_TRACKING_PARTICIPANT, normalizeSwitchValueExternal(value)));
-                break;
-            case CAMERA_LABEL_TRACKING_PIP:
-                send(String.format(CAMERA_NEAR_TRACKING_PIP, value));
-                break;
-            case CAMERA_LABEL_TRACKING_WAKE:
-                send(String.format(CAMERA_NEAR_TRACKING_WAKE, normalizeSwitchValueExternal(value)));
-                break;
-            case CAMERA_LABEL_TRACKING_SPEED:
-                send(String.format(CAMERA_NEAR_TRACKING_SPEED, value));
-                break;
-            default:
-                logger.trace("Command operation is not supported: " + property);
-                break;
+        commandOperationLock.lock();
+        try {
+            updateLatestControlTimestamp();
+            updateLocalControllableProperty(property, value);
+
+            switch (property) {
+                case AUDIO_LABEL_VOLUME:
+                    send(String.format(VOLUME, SET) + removeDecimalPoint(value));
+                    break;
+                case AUDIO_LABEL_MUTE:
+                    if ("0".equals(value)) {
+                        unmute();
+                    } else {
+                        mute();
+                    }
+                    break;
+                case CAMERA_LABEL_PAN:
+                    Map<String, Float> cameraPosition = getCameraPosition();
+                    send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(value),
+                            removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(String.valueOf(cameraPosition.get("Zoom")))));
+                    break;
+                case CAMERA_LABEL_TILT:
+                    cameraPosition = getCameraPosition();
+                    send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition.get("Pan"))),
+                            removeDecimalPoint(value), removeDecimalPoint(String.valueOf(cameraPosition.get("Zoom")))));
+                    break;
+                case CAMERA_LABEL_ZOOM:
+                    cameraPosition = getCameraPosition();
+                    send(String.format(CAMERA_NEAR_SETPOSITION, removeDecimalPoint(String.valueOf(cameraPosition.get("Pan"))),
+                            removeDecimalPoint(String.valueOf(cameraPosition.get("Tilt"))), removeDecimalPoint(value)));
+                    break;
+                case CAMERA_LABEL_MUTE:
+                    send(String.format(VIDEOMUTE, normalizeSwitchValueExternal(value)));
+                    break;
+                case CAMERA_LABEL_INVERT:
+                    send(String.format(CAMERA_INVERT_NEAR, normalizeSwitchValueExternal(value)));
+                    break;
+                case CAMERA_LABEL_TRACKING:
+                    send(String.format(CAMERA_NEAR_TRACKING, normalizeSwitchValueExternal(value)));
+                    break;
+                case CAMERA_LABEL_TRACKING_CALIBRATE:
+                    send(String.format(CAMERA_NEAR_TRACKING_CALIBRATE, normalizeSwitchValueExternal(value)));
+                    break;
+                case CAMERA_LABEL_TRACKING_FRAMING:
+                    send(String.format(CAMERA_NEAR_TRACKING_FRAMING, value));
+                    break;
+                case CAMERA_LABEL_TRACKING_MODE:
+                    send(String.format(CAMERA_NEAR_TRACKING_MODE, value));
+                    break;
+                case CAMERA_LABEL_TRACKING_PARTICIPANT:
+                    send(String.format(CAMERA_NEAR_TRACKING_PARTICIPANT, normalizeSwitchValueExternal(value)));
+                    break;
+                case CAMERA_LABEL_TRACKING_PIP:
+                    send(String.format(CAMERA_NEAR_TRACKING_PIP, value));
+                    break;
+                case CAMERA_LABEL_TRACKING_WAKE:
+                    send(String.format(CAMERA_NEAR_TRACKING_WAKE, normalizeSwitchValueExternal(value)));
+                    break;
+                case CAMERA_LABEL_TRACKING_SPEED:
+                    send(String.format(CAMERA_NEAR_TRACKING_SPEED, value));
+                    break;
+                default:
+                    logger.trace("Command operation is not supported: " + property);
+                    break;
+            }
+        } finally {
+            commandOperationLock.unlock();
         }
     }
 
@@ -1314,7 +1399,44 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         }
         return response;
     }
+
+    /**
+     * For better usability, emergency delivery operations, triggered by control actions, end up with receiving latest
+     * statistics values (saved in {@link #localStatistics}) that are updated with updated controllable properties values
+     * before being returned. It is done in order to eliminate timeout errors and reduce waiting time between control
+     * operations (so all the controls that happen during certain period of time are not interrupted by the emergency
+     * delivery operations)
+     *
+     * @param property control property to update
+     * @param value    to set
+     */
+    private void updateLocalControllableProperty(String property, String value) {
+        if (localStatistics == null) {
+            return;
+        }
+        localStatistics.getControllableProperties().stream().filter(cp -> cp.getName().equals(property)).findFirst().ifPresent(cp -> {
+            cp.setValue(value);
+            cp.setTimestamp(new Date());
+        });
+    }
+
+    /**
+     * Update timestamp of the latest control operation
+     */
+    private void updateLatestControlTimestamp() {
+        latestControlTimestamp = System.currentTimeMillis();
+    }
+
+    /***
+     * Check whether the control operations cooldown has ended
+     *
+     * @return boolean value indicating whether the cooldown has ended or not
+     */
+    private boolean isValidControlCoolDown() {
+        return (System.currentTimeMillis() - latestControlTimestamp) < CONTROL_OPERATION_COOLDOWN_MS;
+    }
 }
+
 
 /*
  The following commands are sent to the Polycom Group Series.  Each command has a sample of the expected return data.
