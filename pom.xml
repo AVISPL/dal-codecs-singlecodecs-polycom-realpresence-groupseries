@@ -6,7 +6,7 @@
 
     <groupId>com.avispl.symphony.dal.device.polycom.groupseries</groupId>
     <artifactId>symphony-dal-communicator-polycom-groupseries</artifactId>
-    <version>1.0.5.20429</version>
+    <version>1.0.5</version>
     <properties>
         <symphonyApiVersion>RELEASE</symphonyApiVersion>
     </properties>
