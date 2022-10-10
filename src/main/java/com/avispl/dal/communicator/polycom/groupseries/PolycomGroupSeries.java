@@ -1152,7 +1152,9 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
                 Thread.sleep(commandsCooldownDelay);
             }
             lastCommandTimestamp = System.currentTimeMillis();
-            System.out.println("Requesting " + data + ": " + System.currentTimeMillis());
+            if (logger.isDebugEnabled()) {
+                logger.debug(String.format("Issuing command %s, timestamp: %s", data, lastCommandTimestamp));
+            }
             return super.send(data);
         } finally {
             commandOperationLock.unlock();
