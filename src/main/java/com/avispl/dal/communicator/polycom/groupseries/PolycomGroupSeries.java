@@ -96,6 +96,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     private static final String CAMERA_LABEL_TRACKING_PIP = "Camera#TrackingPIP";
     private static final String CAMERA_LABEL_TRACKING_WAKE = "Camera#TrackingWake";
     private static final String CAMERA_LABEL_TRACKING_SPEED = "Camera#TrackingSpeed";
+    private static final String DEVICE_LABEL_REBOOT = "Device#Reboot";
 
     private static final String AUDIO_TX_RATE_CODE = "tar";
     private static final String AUDIO_RX_RATE_CODE = "rar";
@@ -143,6 +144,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * for {@link #CONTROL_OPERATION_COOLDOWN_MS} before collecting new statistics
      */
     private long latestControlTimestamp;
+    private long commandsCooldownDelay = 200;
 
     /**
      * Cooldown period for control operation. Most control operations (toggle/slider based in this case) may be
@@ -153,9 +155,32 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private static final int CONTROL_OPERATION_COOLDOWN_MS = 5000;
 
+    /**
+     * Timestamp of the latest command sent to a device.
+     * */
+    private long lastCommandTimestamp;
+
     ReentrantLock commandOperationLock = new ReentrantLock();
     private ExtendedStatistics localStatistics;
     private EndpointStatistics localEndpointStatistics;
+
+    /**
+     * Retrieves {@link #commandsCooldownDelay}
+     *
+     * @return value of {@link #commandsCooldownDelay}
+     */
+    public long getCommandsCooldownDelay() {
+        return commandsCooldownDelay;
+    }
+
+    /**
+     * Sets {@link #commandsCooldownDelay} value
+     *
+     * @param commandsCooldownDelay new value of {@link #commandsCooldownDelay}
+     */
+    public void setCommandsCooldownDelay(long commandsCooldownDelay) {
+        this.commandsCooldownDelay = commandsCooldownDelay;
+    }
 
     private static void cleanDisabledStats(ContentChannelStats stats) {
         Float frameRateRx = stats.getFrameRateRx();
@@ -365,6 +390,14 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         super.internalInit();
     }
 
+    @Override
+    protected void internalDestroy() {
+        if (logger.isDebugEnabled()) {
+            logger.debug("Internal destroy was issued for the adapter!");
+        }
+        super.internalDestroy();
+    }
+
     /**
      * {@inheritDoc} <br>
      *
@@ -411,7 +444,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             String deviceStatus = retrieveStatus();
 
             extractDeviceStatus(extendedStatisticsData, deviceStatus);
-            populateDeviceData(extendedStatisticsData);
+            populateDeviceData(extendedStatisticsData, advancedControllableProperties);
 
             populateAudioData(extendedStatisticsData, advancedControllableProperties);
 
@@ -875,7 +908,10 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @param statistics ExtendedStatistics map, that contains all the statistics properties
      * @throws Exception if any error occurs
      */
-    private void populateDeviceData(Map<String, String> statistics) throws Exception {
+    private void populateDeviceData(Map<String, String> statistics, List<AdvancedControllableProperty> controls) throws Exception {
+        controls.add(createButton(DEVICE_LABEL_REBOOT, "Reboot", "Rebooting...", 120000));
+        statistics.put(DEVICE_LABEL_REBOOT, "");
+
         String whoamiLines = retrieveDeviceStats(WHOAMI);
         if (StringUtils.isNullOrEmpty(whoamiLines, true)) {
             if (logger.isDebugEnabled()) {
@@ -957,6 +993,24 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         return new AdvancedControllableProperty(name, new Date(), slider, initialValue);
     }
 
+    /**
+     * Instantiate Button controllable property
+     *
+     * @param name         name of the property
+     * @param label        default button label
+     * @param labelPressed button label when is pressed
+     * @param gracePeriod  period to pause monitoring statistics for
+     * @return instance of AdvancedControllableProperty with AdvancedControllableProperty.Button as type
+     */
+    private AdvancedControllableProperty createButton(String name, String label, String labelPressed, long gracePeriod) {
+        AdvancedControllableProperty.Button button = new AdvancedControllableProperty.Button();
+        button.setLabel(label);
+        button.setLabelPressed(labelPressed);
+        button.setGracePeriod(gracePeriod);
+
+        return new AdvancedControllableProperty(name, new Date(), button, "");
+    }
+
     /***
      * Create AdvancedControllableProperty preset instance
      * @param name name of the control
@@ -976,7 +1030,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      *
      * @param name   name of the switch
      * @param status initial switch state (0|1)
-     * @return AdvancedControllableProperty button instance
+     * @return AdvancedControllableProperty switch instance
      */
     private AdvancedControllableProperty createSwitch(String name, int status) {
         AdvancedControllableProperty.Switch toggle = new AdvancedControllableProperty.Switch();
@@ -1089,6 +1143,23 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         }
     }
 
+    @Override
+    public String send(String data) throws Exception {
+        commandOperationLock.lock();
+        try {
+            if (System.currentTimeMillis() - lastCommandTimestamp < commandsCooldownDelay) {
+                Thread.sleep(commandsCooldownDelay);
+            }
+            lastCommandTimestamp = System.currentTimeMillis();
+            if (logger.isDebugEnabled()) {
+                logger.debug(String.format("Issuing command %s, timestamp: %s", data, lastCommandTimestamp));
+            }
+            return super.send(data);
+        } finally {
+            commandOperationLock.unlock();
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -1156,6 +1227,9 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             updateLocalControllableProperty(property, value);
 
             switch (property) {
+                case DEVICE_LABEL_REBOOT:
+                    send("reboot now");
+                    break;
                 case AUDIO_LABEL_VOLUME:
                     send(String.format(VOLUME, SET) + removeDecimalPoint(value));
                     break;
