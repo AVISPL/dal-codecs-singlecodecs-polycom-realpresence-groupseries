@@ -913,9 +913,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         controls.add(createButton(DEVICE_LABEL_REBOOT, "Reboot", "Rebooting...", 120000));
         statistics.put(DEVICE_LABEL_REBOOT, "");
 
-        controls.add(createButton("SelfDestruct", "SelfDestruct", "SelfDestructing...", 0));
-        statistics.put("SelfDestruct", "");
-
         String whoamiLines = retrieveDeviceStats(WHOAMI);
         if (StringUtils.isNullOrEmpty(whoamiLines, true)) {
             if (logger.isDebugEnabled()) {
@@ -1231,9 +1228,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             switch (property) {
                 case DEVICE_LABEL_REBOOT:
                     send("reboot now");
-                    break;
-                case "SelfDestruct":
-                    internalDestroy();
                     break;
                 case AUDIO_LABEL_VOLUME:
                     send(String.format(VOLUME, SET) + removeDecimalPoint(value));
