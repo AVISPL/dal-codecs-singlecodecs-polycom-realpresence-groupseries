@@ -144,6 +144,9 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * for {@link #CONTROL_OPERATION_COOLDOWN_MS} before collecting new statistics
      */
     private long latestControlTimestamp;
+    /**
+     * A default delay to apply in between of all the commands performed by the adapter.
+     * */
     private long commandsCooldownDelay = 200;
 
     /**
@@ -174,12 +177,12 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
     }
 
     /**
-     * Sets {@link #commandsCooldownDelay} value
+     * Sets {@link #commandsCooldownDelay} value. Must not be less than 200ms
      *
      * @param commandsCooldownDelay new value of {@link #commandsCooldownDelay}
      */
     public void setCommandsCooldownDelay(long commandsCooldownDelay) {
-        this.commandsCooldownDelay = commandsCooldownDelay;
+        this.commandsCooldownDelay = Math.max(200, commandsCooldownDelay);
     }
 
     private static void cleanDisabledStats(ContentChannelStats stats) {
