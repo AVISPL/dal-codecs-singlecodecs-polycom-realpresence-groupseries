@@ -44,7 +44,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      *	See https://support.polycom.com/content/dam/polycom-support/products/telepresence-and-video/g7500/user/en/g7500-command-line-api-reference-guide.pdf
      *	for tokens details
      */
-    private static final String REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS = "[^\\d.]";
+    private static final String REGEX_MATCH_ADDRESS = "([^\\s:]+\\.[^\\s:]+)+";
     private static final String HANGUP_ALL = "hangup all";
     private static final String LOWER_CASE_P = "p";
     private static final String GATEKEEPERIP_GET = "gatekeeperip get";
@@ -1390,17 +1390,17 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         RegistrationStatus registrationStatus = new RegistrationStatus();
         registrationStatus.setH323Registered(false);
         registrationStatus.setSipRegistered(false);
-
+        Pattern addressMatcher = Pattern.compile(REGEX_MATCH_ADDRESS);
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
-        String sipRegistrarIpString = send(SYSTEMSETTING_GET_SIPREGISTRARSERVER).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
-        if (!StringUtils.isNullOrEmpty(sipRegistrarIpString, true)) {
-            registrationStatus.setSipRegistrar(sipRegistrarIpString);
+        Matcher sipRegistrarIpStringMatcher = addressMatcher.matcher(send(SYSTEMSETTING_GET_SIPREGISTRARSERVER));
+        if (sipRegistrarIpStringMatcher.find()) {
+            registrationStatus.setSipRegistrar(sipRegistrarIpStringMatcher.group());
         }
 
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the gatekeeper)
-        String gatekeeperIpString = send(GATEKEEPERIP_GET).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
-        if (!StringUtils.isNullOrEmpty(gatekeeperIpString, true)) {
-            registrationStatus.setH323Gatekeeper(gatekeeperIpString);
+        Matcher gatekeeperIpStringMatcher = addressMatcher.matcher(send(GATEKEEPERIP_GET));
+        if (gatekeeperIpStringMatcher.find()) {
+            registrationStatus.setH323Gatekeeper(gatekeeperIpStringMatcher.group());
         }
 
         String gateKeeper = StringUtils.getDataBetween(status, "gatekeeper ", LINE_BREAKER);
