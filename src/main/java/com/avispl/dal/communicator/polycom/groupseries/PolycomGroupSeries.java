@@ -359,7 +359,6 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         commandSuccessList.add("Minutes\r\r\n");
         commandSuccessList.add("Days\r\r\n");
         commandSuccessList.add("Hours\r\r\n");
-        commandSuccessList.add(":*\r\r\n");
         commandSuccessList.add("volume *\r\r\n");
         commandSuccessList.add("camera*\r\r\n");
 
@@ -1388,8 +1387,8 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private RegistrationStatus extractRegistrationStatus(String status) throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
-        registrationStatus.setH323Registered(false);
-        registrationStatus.setSipRegistered(false);
+        registrationStatus.setH323Registered(true);
+        registrationStatus.setSipRegistered(true);
         Pattern addressMatcher = Pattern.compile(REGEX_MATCH_ADDRESS);
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
         Matcher sipRegistrarIpStringMatcher = addressMatcher.matcher(send(SYSTEMSETTING_GET_SIPREGISTRARSERVER));
