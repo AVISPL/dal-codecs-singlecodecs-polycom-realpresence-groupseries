@@ -359,6 +359,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         commandSuccessList.add("Minutes\r\r\n");
         commandSuccessList.add("Days\r\r\n");
         commandSuccessList.add("Hours\r\r\n");
+        commandSuccessList.add("Model:*\r\r\n");
         commandSuccessList.add("volume *\r\r\n");
         commandSuccessList.add("camera*\r\r\n");
 
@@ -943,7 +944,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private void extractDeviceStatus(Map<String, String> statistics, String status) {
-        if (StringUtils.isNullOrEmpty(status, true)) {
+        if (StringUtils.isNullOrEmpty(status, true) || NULL_STATISTIC.equals(status)) {
             if (logger.isDebugEnabled()) {
                 logger.debug("Empty status command response, skipping.");
             }
@@ -1387,8 +1388,15 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private RegistrationStatus extractRegistrationStatus(String status) throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
-        registrationStatus.setH323Registered(true);
-        registrationStatus.setSipRegistered(true);
+        if (NULL_STATISTIC.equals(status)) {
+            // If for any specific reason 'status' result is not available (due to an error) -
+            // the adapter is unable to provide any status
+            registrationStatus.setH323Registered(null);
+            registrationStatus.setSipRegistered(null);
+        } else {
+            registrationStatus.setH323Registered(true);
+            registrationStatus.setSipRegistered(true);
+        }
         Pattern addressMatcher = Pattern.compile(REGEX_MATCH_ADDRESS);
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
         Matcher sipRegistrarIpStringMatcher = addressMatcher.matcher(send(SYSTEMSETTING_GET_SIPREGISTRARSERVER));
@@ -1455,6 +1463,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             if (logger.isTraceEnabled()) {
                 logger.trace("This device does not support or recognize the Status command (Polycom needs to be Verion 6 or above)");
             }
+            return NULL_STATISTIC;
         }
         return status;
     }
