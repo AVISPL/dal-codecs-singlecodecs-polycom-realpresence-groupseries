@@ -411,11 +411,20 @@ public class PolycomGroupSeriesTest {
 	}
 
 	@Test
-	public void testRetrieveStatistics() throws Exception {
+	public void testCameraPan() throws Exception {
 		List<Statistics> statistics = polycomGroupSeries.getMultipleStatistics();
 		ControllableProperty controllableProperty = new ControllableProperty();
 		controllableProperty.setProperty("Camera#Pan");
 		controllableProperty.setValue("0.0");
+		polycomGroupSeries.controlProperty(controllableProperty);
+	}
+
+	@Test
+	public void testReboot() throws Exception {
+		List<Statistics> statistics = polycomGroupSeries.getMultipleStatistics();
+		ControllableProperty controllableProperty = new ControllableProperty();
+		controllableProperty.setProperty("Device#Reboot");
+		controllableProperty.setValue("");
 		polycomGroupSeries.controlProperty(controllableProperty);
 	}
 
