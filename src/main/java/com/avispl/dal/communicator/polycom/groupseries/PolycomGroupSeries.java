@@ -362,6 +362,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         commandSuccessList.add("Model:*\r\r\n");
         commandSuccessList.add("volume *\r\r\n");
         commandSuccessList.add("camera*\r\r\n");
+        commandSuccessList.add("reboot now*\r\r\n");
 
         setCommandSuccessList(commandSuccessList);
 
