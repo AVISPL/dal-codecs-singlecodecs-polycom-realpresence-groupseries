@@ -44,7 +44,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      *	See https://support.polycom.com/content/dam/polycom-support/products/telepresence-and-video/g7500/user/en/g7500-command-line-api-reference-guide.pdf
      *	for tokens details
      */
-    private static final String REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS = "[^\\d.]";
+    private static final String REGEX_MATCH_ADDRESS = "([^\\s:]+\\.[^\\s:]+)+";
     private static final String HANGUP_ALL = "hangup all";
     private static final String LOWER_CASE_P = "p";
     private static final String GATEKEEPERIP_GET = "gatekeeperip get";
@@ -359,9 +359,10 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
         commandSuccessList.add("Minutes\r\r\n");
         commandSuccessList.add("Days\r\r\n");
         commandSuccessList.add("Hours\r\r\n");
-        commandSuccessList.add(":*\r\r\n");
+        commandSuccessList.add("Model:*\r\r\n");
         commandSuccessList.add("volume *\r\r\n");
         commandSuccessList.add("camera*\r\r\n");
+        commandSuccessList.add("reboot now*\r\r\n");
 
         setCommandSuccessList(commandSuccessList);
 
@@ -944,7 +945,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      * @throws Exception if any error occurs
      */
     private void extractDeviceStatus(Map<String, String> statistics, String status) {
-        if (StringUtils.isNullOrEmpty(status, true)) {
+        if (StringUtils.isNullOrEmpty(status, true) || NULL_STATISTIC.equals(status)) {
             if (logger.isDebugEnabled()) {
                 logger.debug("Empty status command response, skipping.");
             }
@@ -1388,19 +1389,26 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
      */
     private RegistrationStatus extractRegistrationStatus(String status) throws Exception {
         RegistrationStatus registrationStatus = new RegistrationStatus();
-        registrationStatus.setH323Registered(false);
-        registrationStatus.setSipRegistered(false);
-
+        if (NULL_STATISTIC.equals(status)) {
+            // If for any specific reason 'status' result is not available (due to an error) -
+            // the adapter is unable to provide any status
+            registrationStatus.setH323Registered(null);
+            registrationStatus.setSipRegistered(null);
+        } else {
+            registrationStatus.setH323Registered(true);
+            registrationStatus.setSipRegistered(true);
+        }
+        Pattern addressMatcher = Pattern.compile(REGEX_MATCH_ADDRESS);
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the registrar)
-        String sipRegistrarIpString = send(SYSTEMSETTING_GET_SIPREGISTRARSERVER).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
-        if (!StringUtils.isNullOrEmpty(sipRegistrarIpString, true)) {
-            registrationStatus.setSipRegistrar(sipRegistrarIpString);
+        Matcher sipRegistrarIpStringMatcher = addressMatcher.matcher(send(SYSTEMSETTING_GET_SIPREGISTRARSERVER));
+        if (sipRegistrarIpStringMatcher.find()) {
+            registrationStatus.setSipRegistrar(sipRegistrarIpStringMatcher.group());
         }
 
         // use replace all and regex to remove all alphabetic characters (leaving only the ip address of the gatekeeper)
-        String gatekeeperIpString = send(GATEKEEPERIP_GET).replaceAll(REGEX_REMOVE_ALL_ALPHABETIC_CHARACTERS, "");
-        if (!StringUtils.isNullOrEmpty(gatekeeperIpString, true)) {
-            registrationStatus.setH323Gatekeeper(gatekeeperIpString);
+        Matcher gatekeeperIpStringMatcher = addressMatcher.matcher(send(GATEKEEPERIP_GET));
+        if (gatekeeperIpStringMatcher.find()) {
+            registrationStatus.setH323Gatekeeper(gatekeeperIpStringMatcher.group());
         }
 
         String gateKeeper = StringUtils.getDataBetween(status, "gatekeeper ", LINE_BREAKER);
@@ -1456,6 +1464,7 @@ public class PolycomGroupSeries extends SshCommunicator implements CallControlle
             if (logger.isTraceEnabled()) {
                 logger.trace("This device does not support or recognize the Status command (Polycom needs to be Verion 6 or above)");
             }
+            return NULL_STATISTIC;
         }
         return status;
     }
